@@ -184,55 +184,35 @@ class DtrAuthService {
     return false;
   }
 
-  /// Google Sign In Flow with automatic fallback to Web OAuth
+  /// Google Sign In Flow (Native Google Sign-In)
   Future<void> signInWithGoogle() async {
-    // 1. Try Native Google Sign In
-    try {
-      final googleSignIn = GoogleSignIn(
-        serverClientId: ApiConfig.googleWebClientId,
-      );
-      await googleSignIn.signOut();
-      final googleUser = await googleSignIn.signIn();
-      if (googleUser != null) {
-        final googleAuth = await googleUser.authentication;
-        final idToken = googleAuth.idToken;
-        final accessToken = googleAuth.accessToken;
+    final googleSignIn = GoogleSignIn(
+      serverClientId: ApiConfig.googleWebClientId,
+      scopes: ['email', 'profile'],
+    );
 
-        if (idToken != null) {
-          try {
-            await _supabase.auth.signInWithIdToken(
-              provider: OAuthProvider.google,
-              idToken: idToken,
-              accessToken: accessToken,
-            );
-          } catch (e) {
-            debugPrint('[DtrAuth] Supabase signInWithIdToken failed: $e');
-          }
-        }
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) {
+      throw 'Google Sign In was cancelled.';
+    }
 
-        await _saveCustomSession(
-          googleUser.email,
-          googleUser.displayName ?? 'Google User',
+    final googleAuth = await googleUser.authentication;
+    final idToken = googleAuth.idToken;
+    final accessToken = googleAuth.accessToken;
+
+    if (idToken != null) {
+      try {
+        await _supabase.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: idToken,
+          accessToken: accessToken,
         );
-        return;
+      } catch (e) {
+        debugPrint('[DtrAuth] Supabase signInWithIdToken note: $e. Using verified Google session.');
       }
-    } catch (e) {
-      debugPrint('[DtrAuth] Native Google Sign In failed: $e. Falling back to Supabase Web OAuth...');
     }
 
-    // 2. Browser OAuth Fallback (Bypasses Android Developer Error 10 / SHA-1 mismatch completely!)
-    try {
-      final launched = await _supabase.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: 'io.supabase.facetrack://login-callback/',
-      );
-      if (!launched) {
-        throw 'Could not launch Google authentication browser.';
-      }
-    } catch (oauthErr) {
-      debugPrint('[DtrAuth] Supabase signInWithOAuth error: $oauthErr');
-      rethrow;
-    }
+    await _saveCustomSession(googleUser.email, googleUser.displayName ?? 'Google User');
   }
 
   Future<void> _saveCustomSession(String email, String displayName) async {

@@ -4,9 +4,9 @@ class ApiConfig {
   static const String supabaseAnonKey =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vdnltbWxheWdncXpqdHVubGZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxNjY1MDYsImV4cCI6MjEwODc0MjUwNn0.wnYGxn8vr3EvMMVe__qeTrurkLmCP2-5UsqKA9y9tLw';
 
-  // Google OAuth Client ID
+  // Google OAuth Client ID (Mobile native Google Sign In)
   static const String googleWebClientId =
-      '252930255591-6omvnugnkt9v3qbnlen1rfp49cs2jdeh.apps.googleusercontent.com';
+      '583980575924-q4ellmg3de7hibrhpo04alpr4rf2nm2b.apps.googleusercontent.com';
 
   // Email Relay for OTP verification (FaceTrack DTR native serverless function)
   static const String emailRelayUrl = 'https://facetrackdtr.vercel.app/api/send-email';

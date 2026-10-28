@@ -49,7 +49,9 @@ class _SignInScreenState extends State<SignInScreen> {
         );
       }
     } catch (e) {
-      setState(() => _errorMessage = 'Google sign-in error: $e');
+      if (!e.toString().toLowerCase().contains('cancel')) {
+        setState(() => _errorMessage = 'Google sign-in error: $e');
+      }
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
     }
@@ -183,46 +185,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           ),
                   ),
 
-                  const SizedBox(height: 36),
-
-                  // Feature Cards / Highlights
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF8FAFC),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    child: Column(
-                      children: [
-                        _buildFeatureRow(
-                          Icons.flash_on_rounded,
-                          'Instant Access',
-                          'One-tap Google sign-in with no passwords to remember',
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Divider(color: Color(0xFFE2E8F0), height: 1),
-                        ),
-                        _buildFeatureRow(
-                          Icons.camera_alt_rounded,
-                          'Biometric Face Scanner',
-                          'Offline MobileFaceNet on-device kiosk verification',
-                        ),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Divider(color: Color(0xFFE2E8F0), height: 1),
-                        ),
-                        _buildFeatureRow(
-                          Icons.business_rounded,
-                          'Multi-Office Ready',
-                          'Manage up to 3 office rooms with real-time logs',
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 32),
                   const Center(
                     child: Text(
                       'FaceTrack (DTR) • Secure OAuth 2.0',
@@ -239,49 +202,6 @@ class _SignInScreenState extends State<SignInScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildFeatureRow(IconData icon, String title, String subtitle) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Icon(icon, size: 18, color: Colors.black),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF64748B),
-                  height: 1.3,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
