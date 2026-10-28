@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-labelledby="titleC">
+  <title id="titleC">FaceTrack Presence Loop</title>
+  <!-- Unified Negative Space Path with True Compound Geometry -->
+  <path fill="#0F172A" fill-rule="evenodd" d="
+    M94 40 C64.18 40 40 64.18 40 94 L40 162 C40 191.82 64.18 216 94 216 L162 216 C191.82 216 216 191.82 216 162 L216 94 C216 64.18 191.82 40 162 40 Z
+    M128 66 A28 28 0 1 0 128.1 66 Z
+    M88 176 L168 176 C168 153.9 150.1 136 128 136 C105.9 136 88 153.9 88 176 Z
+    M64 124 H78 V132 H64 Z
+    M178 124 H192 V132 H178 Z
+  "/>
+</svg>

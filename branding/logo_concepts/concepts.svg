@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="840" viewBox="0 0 1600 840"><defs><filter id="grey"><feColorMatrix type="saturate" values="0"/></filter></defs><rect width="1600" height="840" fill="#f7f7f4"/><text x="60" y="78" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="40" font-weight="700" fill="#161616">FaceTrack (DTR) — Identity Concepts</text><text x="60" y="116" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="20" fill="#6b6b6b">Touchless On-Device Biometric Attendance</text><rect x="60" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleA" viewBox="0 0 256 256" x="90" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c0-titleA">FaceTrack Biometric Aperture Symbol</title>
+  <!-- 4 Corner Precision Brackets -->
+  <path fill="#0F172A" d="M48 64 C48 55.16 55.16 48 64 48 L96 48 C100.42 48 104 51.58 104 56 C104 60.42 100.42 64 96 64 L64 64 L64 96 C64 100.42 60.42 104 56 104 C51.58 104 48 100.42 48 96 Z"/>
+  <path fill="#0F172A" d="M192 48 C200.84 48 208 55.16 208 64 L208 96 C208 100.42 204.42 104 200 104 C195.58 104 192 100.42 192 96 L192 64 L160 64 C155.58 64 152 60.42 152 56 C152 51.58 155.58 48 160 48 Z"/>
+  <path fill="#0F172A" d="M48 160 C48 155.58 51.58 152 56 152 C60.42 152 64 155.58 64 160 L64 192 L96 192 C100.42 192 104 195.58 104 200 C104 204.42 100.42 208 96 208 L64 208 C55.16 208 48 200.84 48 192 Z"/>
+  <path fill="#0F172A" d="M208 160 C208 155.58 204.42 152 200 152 C195.58 152 192 155.58 192 160 L192 192 L160 192 C155.58 192 152 195.58 152 200 C152 204.42 155.58 208 160 208 L192 208 C200.84 208 208 200.84 208 192 Z"/>
+  
+  <!-- Central Biometric Face Contour & Focal Target -->
+  <!-- Upper Face Arc -->
+  <path fill="#0F172A" d="M128 80 C110.33 80 96 94.33 96 112 C96 116.42 99.58 120 104 120 C108.42 120 112 116.42 112 112 C112 103.16 119.16 96 128 96 C136.84 96 144 103.16 144 112 C144 116.42 147.58 120 152 120 C156.42 120 160 116.42 160 112 C160 94.33 145.67 80 128 80 Z"/>
+  
+  <!-- Central Reticle Core -->
+  <circle cx="128" cy="128" r="14" fill="#0F172A"/>
+
+  <!-- Lower Chin / Jaw Contour -->
+  <path fill="#0F172A" d="M104 136 C99.58 136 96 139.58 96 144 C96 161.67 110.33 176 128 176 C145.67 176 160 161.67 160 144 C160 139.58 156.42 136 152 136 C147.58 136 144 139.58 144 144 C144 152.84 136.84 160 128 160 C119.16 160 112 152.84 112 144 C112 139.58 108.42 136 104 136 Z"/>
+</svg></g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleA" viewBox="0 0 256 256" x="90" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s064-titleA">FaceTrack Biometric Aperture Symbol</title>
+  <!-- 4 Corner Precision Brackets -->
+  <path fill="#0F172A" d="M48 64 C48 55.16 55.16 48 64 48 L96 48 C100.42 48 104 51.58 104 56 C104 60.42 100.42 64 96 64 L64 64 L64 96 C64 100.42 60.42 104 56 104 C51.58 104 48 100.42 48 96 Z"/>
+  <path fill="#0F172A" d="M192 48 C200.84 48 208 55.16 208 64 L208 96 C208 100.42 204.42 104 200 104 C195.58 104 192 100.42 192 96 L192 64 L160 64 C155.58 64 152 60.42 152 56 C152 51.58 155.58 48 160 48 Z"/>
+  <path fill="#0F172A" d="M48 160 C48 155.58 51.58 152 56 152 C60.42 152 64 155.58 64 160 L64 192 L96 192 C100.42 192 104 195.58 104 200 C104 204.42 100.42 208 96 208 L64 208 C55.16 208 48 200.84 48 192 Z"/>
+  <path fill="#0F172A" d="M208 160 C208 155.58 204.42 152 200 152 C195.58 152 192 155.58 192 160 L192 192 L160 192 C155.58 192 152 195.58 152 200 C152 204.42 155.58 208 160 208 L192 208 C200.84 208 208 200.84 208 192 Z"/>
+  
+  <!-- Central Biometric Face Contour & Focal Target -->
+  <!-- Upper Face Arc -->
+  <path fill="#0F172A" d="M128 80 C110.33 80 96 94.33 96 112 C96 116.42 99.58 120 104 120 C108.42 120 112 116.42 112 112 C112 103.16 119.16 96 128 96 C136.84 96 144 103.16 144 112 C144 116.42 147.58 120 152 120 C156.42 120 160 116.42 160 112 C160 94.33 145.67 80 128 80 Z"/>
+  
+  <!-- Central Reticle Core -->
+  <circle cx="128" cy="128" r="14" fill="#0F172A"/>
+
+  <!-- Lower Chin / Jaw Contour -->
+  <path fill="#0F172A" d="M104 136 C99.58 136 96 139.58 96 144 C96 161.67 110.33 176 128 176 C145.67 176 160 161.67 160 144 C160 139.58 156.42 136 152 136 C147.58 136 144 139.58 144 144 C144 152.84 136.84 160 128 160 C119.16 160 112 152.84 112 144 C112 139.58 108.42 136 104 136 Z"/>
+</svg></g><text x="122" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleA" viewBox="0 0 256 256" x="180" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s032-titleA">FaceTrack Biometric Aperture Symbol</title>
+  <!-- 4 Corner Precision Brackets -->
+  <path fill="#0F172A" d="M48 64 C48 55.16 55.16 48 64 48 L96 48 C100.42 48 104 51.58 104 56 C104 60.42 100.42 64 96 64 L64 64 L64 96 C64 100.42 60.42 104 56 104 C51.58 104 48 100.42 48 96 Z"/>
+  <path fill="#0F172A" d="M192 48 C200.84 48 208 55.16 208 64 L208 96 C208 100.42 204.42 104 200 104 C195.58 104 192 100.42 192 96 L192 64 L160 64 C155.58 64 152 60.42 152 56 C152 51.58 155.58 48 160 48 Z"/>
+  <path fill="#0F172A" d="M48 160 C48 155.58 51.58 152 56 152 C60.42 152 64 155.58 64 160 L64 192 L96 192 C100.42 192 104 195.58 104 200 C104 204.42 100.42 208 96 208 L64 208 C55.16 208 48 200.84 48 192 Z"/>
+  <path fill="#0F172A" d="M208 160 C208 155.58 204.42 152 200 152 C195.58 152 192 155.58 192 160 L192 192 L160 192 C155.58 192 152 195.58 152 200 C152 204.42 155.58 208 160 208 L192 208 C200.84 208 208 200.84 208 192 Z"/>
+  
+  <!-- Central Biometric Face Contour & Focal Target -->
+  <!-- Upper Face Arc -->
+  <path fill="#0F172A" d="M128 80 C110.33 80 96 94.33 96 112 C96 116.42 99.58 120 104 120 C108.42 120 112 116.42 112 112 C112 103.16 119.16 96 128 96 C136.84 96 144 103.16 144 112 C144 116.42 147.58 120 152 120 C156.42 120 160 116.42 160 112 C160 94.33 145.67 80 128 80 Z"/>
+  
+  <!-- Central Reticle Core -->
+  <circle cx="128" cy="128" r="14" fill="#0F172A"/>
+
+  <!-- Lower Chin / Jaw Contour -->
+  <path fill="#0F172A" d="M104 136 C99.58 136 96 139.58 96 144 C96 161.67 110.33 176 128 176 C145.67 176 160 161.67 160 144 C160 139.58 156.42 136 152 136 C147.58 136 144 139.58 144 144 C144 152.84 136.84 160 128 160 C119.16 160 112 152.84 112 144 C112 139.58 108.42 136 104 136 Z"/>
+</svg></g><text x="196" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleA" viewBox="0 0 256 256" x="238" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s016-titleA">FaceTrack Biometric Aperture Symbol</title>
+  <!-- 4 Corner Precision Brackets -->
+  <path fill="#0F172A" d="M48 64 C48 55.16 55.16 48 64 48 L96 48 C100.42 48 104 51.58 104 56 C104 60.42 100.42 64 96 64 L64 64 L64 96 C64 100.42 60.42 104 56 104 C51.58 104 48 100.42 48 96 Z"/>
+  <path fill="#0F172A" d="M192 48 C200.84 48 208 55.16 208 64 L208 96 C208 100.42 204.42 104 200 104 C195.58 104 192 100.42 192 96 L192 64 L160 64 C155.58 64 152 60.42 152 56 C152 51.58 155.58 48 160 48 Z"/>
+  <path fill="#0F172A" d="M48 160 C48 155.58 51.58 152 56 152 C60.42 152 64 155.58 64 160 L64 192 L96 192 C100.42 192 104 195.58 104 200 C104 204.42 100.42 208 96 208 L64 208 C55.16 208 48 200.84 48 192 Z"/>
+  <path fill="#0F172A" d="M208 160 C208 155.58 204.42 152 200 152 C195.58 152 192 155.58 192 160 L192 192 L160 192 C155.58 192 152 195.58 152 200 C152 204.42 155.58 208 160 208 L192 208 C200.84 208 208 200.84 208 192 Z"/>
+  
+  <!-- Central Biometric Face Contour & Focal Target -->
+  <!-- Upper Face Arc -->
+  <path fill="#0F172A" d="M128 80 C110.33 80 96 94.33 96 112 C96 116.42 99.58 120 104 120 C108.42 120 112 116.42 112 112 C112 103.16 119.16 96 128 96 C136.84 96 144 103.16 144 112 C144 116.42 147.58 120 152 120 C156.42 120 160 116.42 160 112 C160 94.33 145.67 80 128 80 Z"/>
+  
+  <!-- Central Reticle Core -->
+  <circle cx="128" cy="128" r="14" fill="#0F172A"/>
+
+  <!-- Lower Chin / Jaw Contour -->
+  <path fill="#0F172A" d="M104 136 C99.58 136 96 139.58 96 144 C96 161.67 110.33 176 128 176 C145.67 176 160 161.67 160 144 C160 139.58 156.42 136 152 136 C147.58 136 144 139.58 144 144 C144 152.84 136.84 160 128 160 C119.16 160 112 152.84 112 144 C112 139.58 108.42 136 104 136 Z"/>
+</svg></g><text x="246" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="90.0" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">A · The Biometric Aperture</text><text x="90.0" y="670" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">Precision aperture brackets enclosing a</text><text x="90.0" y="696" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">central biometric focal reticle.</text><rect x="562.667" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#161616" stroke-width="2"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleB" viewBox="0 0 256 256" x="592.667" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c1-titleB">FaceTrack Scan-F Monogram</title>
+  <!-- Vertical Pillar Stem -->
+  <rect x="52" y="44" width="34" height="168" rx="17" fill="#0F172A"/>
+
+  <!-- Top Scanner Arm with Downward Focus Terminal -->
+  <path fill="#0F172A" d="M72 44 L190 44 C199.94 44 208 52.06 208 62 L208 84 C208 89.52 203.52 94 198 94 C192.48 94 188 89.52 188 84 L188 64 L72 64 C66.48 64 62 59.52 62 54 C62 48.48 66.48 44 72 44 Z"/>
+
+  <!-- Middle Biometric Scan Beam -->
+  <rect x="72" y="112" width="88" height="32" rx="16" fill="#0F172A"/>
+
+  <!-- Dynamic Biometric Pulse Focal Node with True Negative-Space Core -->
+  <path fill="#0F172A" fill-rule="evenodd" d="M192 112 A16 16 0 1 1 191.9 112 Z M192 122 A6 6 0 1 0 192.1 122 Z"/>
+</svg></g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleB" viewBox="0 0 256 256" x="592.667" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s164-titleB">FaceTrack Scan-F Monogram</title>
+  <!-- Vertical Pillar Stem -->
+  <rect x="52" y="44" width="34" height="168" rx="17" fill="#0F172A"/>
+
+  <!-- Top Scanner Arm with Downward Focus Terminal -->
+  <path fill="#0F172A" d="M72 44 L190 44 C199.94 44 208 52.06 208 62 L208 84 C208 89.52 203.52 94 198 94 C192.48 94 188 89.52 188 84 L188 64 L72 64 C66.48 64 62 59.52 62 54 C62 48.48 66.48 44 72 44 Z"/>
+
+  <!-- Middle Biometric Scan Beam -->
+  <rect x="72" y="112" width="88" height="32" rx="16" fill="#0F172A"/>
+
+  <!-- Dynamic Biometric Pulse Focal Node with True Negative-Space Core -->
+  <path fill="#0F172A" fill-rule="evenodd" d="M192 112 A16 16 0 1 1 191.9 112 Z M192 122 A6 6 0 1 0 192.1 122 Z"/>
+</svg></g><text x="624.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleB" viewBox="0 0 256 256" x="682.667" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s132-titleB">FaceTrack Scan-F Monogram</title>
+  <!-- Vertical Pillar Stem -->
+  <rect x="52" y="44" width="34" height="168" rx="17" fill="#0F172A"/>
+
+  <!-- Top Scanner Arm with Downward Focus Terminal -->
+  <path fill="#0F172A" d="M72 44 L190 44 C199.94 44 208 52.06 208 62 L208 84 C208 89.52 203.52 94 198 94 C192.48 94 188 89.52 188 84 L188 64 L72 64 C66.48 64 62 59.52 62 54 C62 48.48 66.48 44 72 44 Z"/>
+
+  <!-- Middle Biometric Scan Beam -->
+  <rect x="72" y="112" width="88" height="32" rx="16" fill="#0F172A"/>
+
+  <!-- Dynamic Biometric Pulse Focal Node with True Negative-Space Core -->
+  <path fill="#0F172A" fill-rule="evenodd" d="M192 112 A16 16 0 1 1 191.9 112 Z M192 122 A6 6 0 1 0 192.1 122 Z"/>
+</svg></g><text x="698.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleB" viewBox="0 0 256 256" x="740.667" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s116-titleB">FaceTrack Scan-F Monogram</title>
+  <!-- Vertical Pillar Stem -->
+  <rect x="52" y="44" width="34" height="168" rx="17" fill="#0F172A"/>
+
+  <!-- Top Scanner Arm with Downward Focus Terminal -->
+  <path fill="#0F172A" d="M72 44 L190 44 C199.94 44 208 52.06 208 62 L208 84 C208 89.52 203.52 94 198 94 C192.48 94 188 89.52 188 84 L188 64 L72 64 C66.48 64 62 59.52 62 54 C62 48.48 66.48 44 72 44 Z"/>
+
+  <!-- Middle Biometric Scan Beam -->
+  <rect x="72" y="112" width="88" height="32" rx="16" fill="#0F172A"/>
+
+  <!-- Dynamic Biometric Pulse Focal Node with True Negative-Space Core -->
+  <path fill="#0F172A" fill-rule="evenodd" d="M192 112 A16 16 0 1 1 191.9 112 Z M192 122 A6 6 0 1 0 192.1 122 Z"/>
+</svg></g><text x="748.667" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="592.6666666666667" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">B · The Scan-F Monogram</text><text x="592.6666666666667" y="664" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#161616" letter-spacing="1.5">RECOMMENDED</text><text x="592.6666666666667" y="698" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">Architectural letter F fused with laser</text><text x="592.6666666666667" y="724" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">scan beam and focal pulse node.</text><rect x="1065.33" y="150" width="474.667" height="630" rx="18" fill="#fff" stroke="#e4e4e0" stroke-width="1"/><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleC" viewBox="0 0 256 256" x="1095.33" y="190" width="414.667" height="300" preserveAspectRatio="xMidYMid meet">
+  <title id="c2-titleC">FaceTrack Presence Loop</title>
+  <!-- Unified Negative Space Path with True Compound Geometry -->
+  <path fill="#0F172A" fill-rule="evenodd" d="
+    M94 40 C64.18 40 40 64.18 40 94 L40 162 C40 191.82 64.18 216 94 216 L162 216 C191.82 216 216 191.82 216 162 L216 94 C216 64.18 191.82 40 162 40 Z
+    M128 66 A28 28 0 1 0 128.1 66 Z
+    M88 176 L168 176 C168 153.9 150.1 136 128 136 C105.9 136 88 153.9 88 176 Z
+    M64 124 H78 V132 H64 Z
+    M178 124 H192 V132 H178 Z
+  "/>
+</svg></g><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleC" viewBox="0 0 256 256" x="1095.33" y="516" width="64" height="64" preserveAspectRatio="xMidYMid meet">
+  <title id="s264-titleC">FaceTrack Presence Loop</title>
+  <!-- Unified Negative Space Path with True Compound Geometry -->
+  <path fill="#0F172A" fill-rule="evenodd" d="
+    M94 40 C64.18 40 40 64.18 40 94 L40 162 C40 191.82 64.18 216 94 216 L162 216 C191.82 216 216 191.82 216 162 L216 94 C216 64.18 191.82 40 162 40 Z
+    M128 66 A28 28 0 1 0 128.1 66 Z
+    M88 176 L168 176 C168 153.9 150.1 136 128 136 C105.9 136 88 153.9 88 176 Z
+    M64 124 H78 V132 H64 Z
+    M178 124 H192 V132 H178 Z
+  "/>
+</svg></g><text x="1127.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">64px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleC" viewBox="0 0 256 256" x="1185.33" y="548" width="32" height="32" preserveAspectRatio="xMidYMid meet">
+  <title id="s232-titleC">FaceTrack Presence Loop</title>
+  <!-- Unified Negative Space Path with True Compound Geometry -->
+  <path fill="#0F172A" fill-rule="evenodd" d="
+    M94 40 C64.18 40 40 64.18 40 94 L40 162 C40 191.82 64.18 216 94 216 L162 216 C191.82 216 216 191.82 216 162 L216 94 C216 64.18 191.82 40 162 40 Z
+    M128 66 A28 28 0 1 0 128.1 66 Z
+    M88 176 L168 176 C168 153.9 150.1 136 128 136 C105.9 136 88 153.9 88 176 Z
+    M64 124 H78 V132 H64 Z
+    M178 124 H192 V132 H178 Z
+  "/>
+</svg></g><text x="1201.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">32px</text><g filter="url(#grey)"><svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titleC" viewBox="0 0 256 256" x="1243.33" y="564" width="16" height="16" preserveAspectRatio="xMidYMid meet">
+  <title id="s216-titleC">FaceTrack Presence Loop</title>
+  <!-- Unified Negative Space Path with True Compound Geometry -->
+  <path fill="#0F172A" fill-rule="evenodd" d="
+    M94 40 C64.18 40 40 64.18 40 94 L40 162 C40 191.82 64.18 216 94 216 L162 216 C191.82 216 216 191.82 216 162 L216 94 C216 64.18 191.82 40 162 40 Z
+    M128 66 A28 28 0 1 0 128.1 66 Z
+    M88 176 L168 176 C168 153.9 150.1 136 128 136 C105.9 136 88 153.9 88 176 Z
+    M64 124 H78 V132 H64 Z
+    M178 124 H192 V132 H178 Z
+  "/>
+</svg></g><text x="1251.33" y="600" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="12" fill="#8a8a8a" text-anchor="middle">16px</text><text x="1095.3333333333335" y="636" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="26" font-weight="700" fill="#161616">C · The Presence Loop</text><text x="1095.3333333333335" y="670" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">Minimalist presence silhouette with</text><text x="1095.3333333333335" y="696" font-family="system-ui,-apple-system,'Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#555">calibrated time-tracking arcs.</text></svg>

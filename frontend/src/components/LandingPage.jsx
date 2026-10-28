@@ -1,6 +1,7 @@
 import React from 'react';
 import { Download, ShieldCheck, Cpu, Building2, CheckCircle2, Clock, Smartphone, Lock, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import BrandLogo from './BrandLogo';
 
 export default function LandingPage({ auth }) {
   const navigate = useNavigate();
@@ -191,8 +192,8 @@ export default function LandingPage({ auth }) {
       {/* Footer */}
       <footer className="border-t border-slate-100 py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 bg-slate-950 rounded-md flex items-center justify-center text-white text-[10px] font-black">
-            F
+          <div className="w-6 h-6 bg-slate-950 rounded-lg flex items-center justify-center p-1 shadow-sm">
+            <BrandLogo className="w-4 h-4 text-white" />
           </div>
           <span className="font-bold text-slate-900">FaceTrack DTR</span>
           <span>• 100% Serverless Facial Attendance</span>

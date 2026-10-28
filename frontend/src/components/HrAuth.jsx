@@ -1,20 +1,31 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { ShieldCheck, Mail, Lock, KeyRound, Building2, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, KeyRound, Building2, ArrowRight, Loader2, User, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import BrandLogo from './BrandLogo';
 
 export default function HrAuth({ onAuthenticated, onSelectRoom }) {
-  const [mode, setMode] = useState('password'); // 'password' | 'code' | 'token'
+  const navigate = useNavigate();
+  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup'
+  const [method, setMethod] = useState('password'); // 'password' | 'code' | 'token'
+  
+  // Form fields
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [roomCode, setRoomCode] = useState('');
-  const [roomToken, setRoomToken] = useState('');
+
+  // Status
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
 
-  // Sign In with Email & Password
-  const handlePasswordLogin = async (e) => {
+  // 1. Password Sign In
+  const handlePasswordSignIn = async (e) => {
     e.preventDefault();
     if (!email || !password) {
       setError('Please provide your account email and password.');
@@ -42,17 +53,63 @@ export default function HrAuth({ onAuthenticated, onSelectRoom }) {
     }
   };
 
-  // Send Email OTP Code
-  const handleSendOtp = async () => {
-    if (!email || !email.includes('@')) {
-      setError('Please enter a valid email address.');
+  // 2. Password Sign Up (Account Registration)
+  const handlePasswordSignUp = async (e) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setError('Please provide your email and a secure password.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match. Please re-enter.');
       return;
     }
     setLoading(true);
     setError(null);
 
     try {
-      // 1. Relay endpoint or Supabase
+      const { data, error: signUpErr } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          data: {
+            full_name: fullName.trim() || 'HR Manager',
+          },
+        },
+      });
+
+      if (signUpErr) throw signUpErr;
+
+      if (data.session) {
+        onAuthenticated({
+          email: email.trim().toLowerCase(),
+          user: data.user,
+        });
+      } else {
+        setSuccess('Account created! Check your email to confirm registration or sign in below.');
+        setAuthMode('signin');
+      }
+    } catch (err) {
+      setError(err.message || 'Sign up failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 3. Send Email OTP Code
+  const handleSendOtp = async () => {
+    if (!email || !email.includes('@')) {
+      setError('Please enter a valid work email address.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
+    try {
       const res = await fetch('https://melo-pi-one.vercel.app/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -65,29 +122,29 @@ export default function HrAuth({ onAuthenticated, onSelectRoom }) {
       if (res.ok) {
         setOtpSent(true);
       } else {
-        // Fallback: Supabase native OTP
+        // Fallback to Supabase native OTP
         await supabase.auth.signInWithOtp({ email: email.trim().toLowerCase() });
         setOtpSent(true);
       }
     } catch (err) {
-      setError('Failed to send code: ' + err.message);
+      setError('Failed to send verification code: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Verify OTP
+  // 4. Verify OTP Code
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     if (!otpCode || otpCode.length !== 6) {
-      setError('Please enter the 6-digit code sent to your email.');
+      setError('Please enter the complete 6-digit verification code.');
       return;
     }
     setLoading(true);
     setError(null);
 
     try {
-      // Check signup_otps table
+      // Check database OTP table
       const { data: rows, error: qErr } = await supabase
         .from('signup_otps')
         .select('*')
@@ -129,7 +186,7 @@ export default function HrAuth({ onAuthenticated, onSelectRoom }) {
     }
   };
 
-  // Direct Room Token Access (One-time link access)
+  // 5. Direct Office Token / Room Code Access
   const handleTokenAccess = async (e) => {
     e.preventDefault();
     if (!roomCode) {
@@ -159,86 +216,272 @@ export default function HrAuth({ onAuthenticated, onSelectRoom }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-slate-800/90 border border-slate-700/80 rounded-3xl p-8 shadow-2xl backdrop-blur-md">
-        {/* App Logo */}
+    <div className="min-h-[calc(100vh-5rem)] bg-slate-50 flex flex-col items-center justify-center p-4 sm:p-6 relative selection:bg-slate-950 selection:text-white">
+      {/* Subtle Background Glow */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-slate-200/60 rounded-full blur-3xl pointer-events-none -z-10" />
+
+      {/* Main Authentication Card */}
+      <div className="w-full max-w-md bg-white border border-slate-200/90 rounded-3xl p-8 sm:p-10 shadow-2xl shadow-slate-200/60">
+        {/* Brand Header */}
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25 mb-4">
-            <ShieldCheck className="w-8 h-8 text-white" />
+          <div className="w-14 h-14 bg-slate-950 rounded-2xl flex items-center justify-center shadow-md mb-4 text-white p-3.5 transition-transform hover:scale-105">
+            <BrandLogo className="w-full h-full text-white" />
           </div>
-          <h2 className="text-2xl font-bold text-white tracking-tight">HR Web Portal</h2>
-          <p className="text-slate-400 text-sm mt-1">Daily Time Record & Live Operational Monitor</p>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-950 tracking-tight">
+            FaceTrack (DTR)
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+            Biometric Attendance & HR Administration
+          </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="grid grid-cols-3 gap-1 bg-slate-900/80 p-1.5 rounded-2xl mb-6 border border-slate-700/60">
+        {/* Primary Toggle: Sign In vs Create Account */}
+        <div className="grid grid-cols-2 p-1.5 bg-slate-100 rounded-full mb-6 border border-slate-200/70">
           <button
             type="button"
-            onClick={() => { setMode('password'); setError(null); }}
-            className={`py-2 text-xs font-bold rounded-xl transition-all ${
-              mode === 'password' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+            onClick={() => {
+              setAuthMode('signin');
+              setError(null);
+              setSuccess(null);
+            }}
+            className={`py-2.5 text-xs font-bold rounded-full transition-all ${
+              authMode === 'signin'
+                ? 'bg-slate-950 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-950'
             }`}
           >
-            Password
+            Sign In
           </button>
           <button
             type="button"
-            onClick={() => { setMode('code'); setError(null); }}
-            className={`py-2 text-xs font-bold rounded-xl transition-all ${
-              mode === 'code' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+            onClick={() => {
+              setAuthMode('signup');
+              setError(null);
+              setSuccess(null);
+              if (method === 'token') setMethod('password');
+            }}
+            className={`py-2.5 text-xs font-bold rounded-full transition-all ${
+              authMode === 'signup'
+                ? 'bg-slate-950 text-white shadow-md'
+                : 'text-slate-600 hover:text-slate-950'
             }`}
           >
-            Email Code
-          </button>
-          <button
-            type="button"
-            onClick={() => { setMode('token'); setError(null); }}
-            className={`py-2 text-xs font-bold rounded-xl transition-all ${
-              mode === 'token' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Office Key
+            Create Account
           </button>
         </div>
 
+        {/* Sub-Methods Switcher */}
+        {authMode === 'signin' ? (
+          <div className="grid grid-cols-3 gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-200 mb-6">
+            <button
+              type="button"
+              onClick={() => { setMethod('password'); setError(null); }}
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                method === 'password'
+                  ? 'bg-white text-slate-950 shadow-sm border border-slate-200/60'
+                  : 'text-slate-500 hover:text-slate-950'
+              }`}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMethod('code'); setError(null); }}
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                method === 'code'
+                  ? 'bg-white text-slate-950 shadow-sm border border-slate-200/60'
+                  : 'text-slate-500 hover:text-slate-950'
+              }`}
+            >
+              Email Code
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMethod('token'); setError(null); }}
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                method === 'token'
+                  ? 'bg-white text-slate-950 shadow-sm border border-slate-200/60'
+                  : 'text-slate-500 hover:text-slate-950'
+              }`}
+            >
+              Office Key
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-1 bg-slate-50 p-1 rounded-2xl border border-slate-200 mb-6">
+            <button
+              type="button"
+              onClick={() => { setMethod('password'); setError(null); }}
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                method === 'password'
+                  ? 'bg-white text-slate-950 shadow-sm border border-slate-200/60'
+                  : 'text-slate-500 hover:text-slate-950'
+              }`}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMethod('code'); setError(null); }}
+              className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                method === 'code'
+                  ? 'bg-white text-slate-950 shadow-sm border border-slate-200/60'
+                  : 'text-slate-500 hover:text-slate-950'
+              }`}
+            >
+              Email Code (OTP)
+            </button>
+          </div>
+        )}
+
+        {/* Feedback Messages */}
         {error && (
-          <div className="mb-6 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-300 text-xs flex items-center gap-2">
+          <div className="mb-6 p-3.5 bg-red-50 border border-red-200 rounded-2xl text-red-700 text-xs flex items-center gap-2">
             <span>{error}</span>
           </div>
         )}
 
-        {/* 1. Password Mode */}
-        {mode === 'password' && (
-          <form onSubmit={handlePasswordLogin} className="space-y-4">
+        {success && (
+          <div className="mb-6 p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{success}</span>
+          </div>
+        )}
+
+        {/* FORM 1: Password Sign In */}
+        {authMode === 'signin' && method === 'password' && (
+          <form onSubmit={handlePasswordSignIn} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                Account Email
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Work Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                <Mail className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="manager@company.com"
-                  className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-slate-950 text-sm focus:outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950 focus:bg-white transition-all placeholder:text-slate-400"
                   required
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                <Lock className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-11 py-3 text-slate-950 text-sm focus:outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950 focus:bg-white transition-all placeholder:text-slate-400"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 bg-slate-950 hover:bg-slate-800 disabled:bg-slate-300 text-white font-bold py-3.5 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <span>Sign In to Dashboard</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </form>
+        )}
+
+        {/* FORM 2: Password Sign Up (Registration) */}
+        {authMode === 'signup' && method === 'password' && (
+          <form onSubmit={handlePasswordSignUp} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Full Name / Organization
+              </label>
+              <div className="relative">
+                <User className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Sarah Jenkins"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-slate-950 text-sm focus:outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950 focus:bg-white transition-all placeholder:text-slate-400"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Work Email
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="manager@company.com"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-slate-950 text-sm focus:outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950 focus:bg-white transition-all placeholder:text-slate-400"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-11 py-3 text-slate-950 text-sm focus:outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950 focus:bg-white transition-all placeholder:text-slate-400"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repeat your password"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-slate-950 text-sm focus:outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950 focus:bg-white transition-all placeholder:text-slate-400"
                   required
                 />
               </div>
@@ -247,29 +490,36 @@ export default function HrAuth({ onAuthenticated, onSelectRoom }) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
+              className="w-full mt-2 bg-slate-950 hover:bg-slate-800 disabled:bg-slate-300 text-white font-bold py-3.5 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Sign In to Dashboard <ArrowRight className="w-4 h-4" /></>}
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <span>Create Account</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
         )}
 
-        {/* 2. Email OTP Mode */}
-        {mode === 'code' && (
+        {/* FORM 3: Email OTP Mode (Sign In or Sign Up) */}
+        {method === 'code' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                Account Email
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Work Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                <Mail className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
                 <input
                   type="email"
                   value={email}
                   disabled={otpSent}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="manager@company.com"
-                  className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 disabled:opacity-60"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-slate-950 text-sm focus:outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950 focus:bg-white transition-all disabled:opacity-60 placeholder:text-slate-400"
                   required
                 />
               </div>
@@ -280,25 +530,25 @@ export default function HrAuth({ onAuthenticated, onSelectRoom }) {
                 type="button"
                 onClick={handleSendOtp}
                 disabled={loading}
-                className="w-full mt-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
+                className="w-full mt-2 bg-slate-950 hover:bg-slate-800 disabled:bg-slate-300 text-white font-bold py-3.5 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send Verification Code'}
               </button>
             ) : (
               <form onSubmit={handleVerifyOtp} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
                     6-Digit Verification Code
                   </label>
                   <div className="relative">
-                    <KeyRound className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                    <KeyRound className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
                     <input
                       type="text"
                       maxLength={6}
                       value={otpCode}
                       onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                       placeholder="123456"
-                      className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-white text-center font-mono text-lg tracking-widest focus:outline-none focus:border-blue-500"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-slate-950 text-center font-mono text-xl tracking-widest focus:outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950 focus:bg-white transition-all"
                       required
                     />
                   </div>
@@ -307,56 +557,67 @@ export default function HrAuth({ onAuthenticated, onSelectRoom }) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
+                  className="w-full bg-slate-950 hover:bg-slate-800 disabled:bg-slate-300 text-white font-bold py-3.5 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm"
                 >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Verify & Access <ArrowRight className="w-4 h-4" /></>}
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Verify & Continue <ArrowRight className="w-4 h-4" /></>}
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setOtpSent(false)}
-                  className="w-full text-xs text-slate-400 hover:text-white transition-colors"
+                  className="w-full text-xs text-slate-500 hover:text-slate-950 font-bold transition-colors py-1"
                 >
-                  Change Email
+                  ← Use a different email
                 </button>
               </form>
             )}
           </div>
         )}
 
-        {/* 3. Direct Room Code / Link Access */}
-        {mode === 'token' && (
+        {/* FORM 4: Direct Office Key Mode */}
+        {authMode === 'signin' && method === 'token' && (
           <form onSubmit={handleTokenAccess} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                Office / Room Code
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                Office / Branch Key
               </label>
               <div className="relative">
-                <Building2 className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                <Building2 className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   value={roomCode}
                   onChange={(e) => setRoomCode(e.target.value)}
                   placeholder="e.g. DTR-7B2K"
-                  className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-white font-mono text-sm uppercase focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-slate-950 font-mono text-sm uppercase focus:outline-none focus:border-slate-950 focus:ring-1 focus:ring-slate-950 focus:bg-white transition-all placeholder:text-slate-400"
                   required
                 />
               </div>
             </div>
 
-            <p className="text-xs text-slate-400">
-              Enter the Office Code generated when creating the room in the Mobile App to access this kiosk's personnel registry and live attendance.
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Enter the unique Office Key generated when creating the room in the Mobile App to view this branch's live logs without full administrator credentials.
             </p>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 text-sm"
+              className="w-full mt-2 bg-slate-950 hover:bg-slate-800 disabled:bg-slate-300 text-white font-bold py-3.5 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 hover:-translate-y-0.5 flex items-center justify-center gap-2 text-sm"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Access Office <ArrowRight className="w-4 h-4" /></>}
             </button>
           </form>
         )}
+
+        {/* Return to Home Navigation */}
+        <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            className="text-xs text-slate-500 hover:text-slate-950 font-bold transition-colors inline-flex items-center gap-1.5"
+          >
+            ← Back to FaceTrack Overview
+          </button>
+        </div>
       </div>
     </div>
   );

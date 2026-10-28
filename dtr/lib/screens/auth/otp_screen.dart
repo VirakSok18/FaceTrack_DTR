@@ -35,7 +35,6 @@ class _OtpScreenState extends State<OtpScreen> {
   void initState() {
     super.initState();
     _startCooldownTimer();
-    // Auto-focus after screen renders
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
@@ -81,35 +80,16 @@ class _OtpScreenState extends State<OtpScreen> {
         fullName: widget.fullName,
       );
 
-      if (success) {
-        // If this is sign up with password, ensure password auth is established
-        if (widget.isSignUp && widget.password != null) {
-          try {
-            await DtrAuthService().signUpWithEmailPassword(
-              email: widget.email,
-              password: widget.password!,
-              fullName: widget.fullName ?? widget.email.split('@').first,
-            );
-          } catch (e) {
-            debugPrint('[OtpScreen] Optional password registration log: $e');
-          }
-        }
-
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const RoomListScreen()),
-            (route) => false,
-          );
-        }
+      if (success && mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const RoomListScreen()),
+          (route) => false,
+        );
       } else {
-        setState(() {
-          _errorMessage = 'Invalid or expired verification code. Please check your inbox or resend.';
-        });
+        setState(() => _errorMessage = 'Invalid or expired verification code.');
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Verification error: ${e.toString()}';
-      });
+      setState(() => _errorMessage = 'Verification error: $e');
     } finally {
       if (mounted) setState(() => _isVerifying = false);
     }
@@ -130,8 +110,9 @@ class _OtpScreenState extends State<OtpScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('A fresh verification code was sent to ${widget.email}'),
-            backgroundColor: const Color(0xFF10B981),
+            backgroundColor: const Color(0xFF0F172A),
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       } else {
@@ -147,12 +128,12 @@ class _OtpScreenState extends State<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // Slate 900
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -168,30 +149,38 @@ class _OtpScreenState extends State<OtpScreen> {
                   // Verification Icon
                   Center(
                     child: Container(
-                      width: 72,
-                      height: 72,
+                      width: 68,
+                      height: 68,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
+                        color: const Color(0xFF0F172A),
                         borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: const Color(0xFF334155)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
-                      child: const Icon(
-                        Icons.mark_email_read_outlined,
-                        color: Color(0xFF3B82F6),
-                        size: 36,
+                      child: const Center(
+                        child: Icon(
+                          Icons.mark_email_read_outlined,
+                          color: Colors.white,
+                          size: 32,
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 22),
 
                   // Header
                   const Text(
                     'Verify Email',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      color: Colors.white,
+                      color: Color(0xFF0F172A),
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -201,41 +190,45 @@ class _OtpScreenState extends State<OtpScreen> {
                     textAlign: TextAlign.center,
                     text: TextSpan(
                       text: 'Enter the 6-digit confirmation code sent to\n',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withOpacity(0.65),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF64748B),
                         height: 1.4,
                       ),
                       children: [
                         TextSpan(
                           text: widget.email,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Color(0xFF0F172A),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
 
                   // Error Banner
                   if (_errorMessage != null) ...[
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red.withOpacity(0.35)),
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFFCA5A5)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.error_outline, color: Colors.redAccent, size: 20),
+                          const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 20),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
                               _errorMessage!,
-                              style: const TextStyle(color: Colors.white, fontSize: 13),
+                              style: const TextStyle(
+                                color: Color(0xFF991B1B),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
                         ],
@@ -247,16 +240,16 @@ class _OtpScreenState extends State<OtpScreen> {
                   // 6-digit Code Input
                   Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(16),
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: _focusNode.hasFocus
-                            ? const Color(0xFF3B82F6)
-                            : const Color(0xFF334155),
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFE2E8F0),
                         width: 1.5,
                       ),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     child: TextField(
                       controller: _otpController,
                       focusNode: _focusNode,
@@ -266,8 +259,8 @@ class _OtpScreenState extends State<OtpScreen> {
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 16,
-                        color: Colors.white,
+                        letterSpacing: 14,
+                        color: Color(0xFF0F172A),
                       ),
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
@@ -277,8 +270,8 @@ class _OtpScreenState extends State<OtpScreen> {
                         border: InputBorder.none,
                         hintText: '••••••',
                         hintStyle: TextStyle(
-                          color: Color(0xFF475569),
-                          letterSpacing: 16,
+                          color: Color(0xFFCBD5E1),
+                          letterSpacing: 14,
                           fontSize: 28,
                         ),
                       ),
@@ -289,36 +282,33 @@ class _OtpScreenState extends State<OtpScreen> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 24),
 
-                  // Verify Button
+                  // Verify Button (Stadium Pill, Black)
                   ElevatedButton(
                     onPressed: _isVerifying ? null : _handleVerify,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF3B82F6),
+                      backgroundColor: const Color(0xFF0F172A),
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: const Color(0xFF1E293B),
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 4,
+                      disabledBackgroundColor: const Color(0xFF94A3B8),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: const StadiumBorder(),
+                      elevation: 0,
                     ),
                     child: _isVerifying
                         ? const SizedBox(
-                            width: 22,
-                            height: 22,
+                            width: 20,
+                            height: 20,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
+                              strokeWidth: 2,
                               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                             ),
                           )
                         : const Text(
-                            'VERIFY & CONTINUE',
+                            'Verify & Continue',
                             style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.2,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                   ),
@@ -328,10 +318,10 @@ class _OtpScreenState extends State<OtpScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
+                      const Text(
                         "Didn't receive the code? ",
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Color(0xFF64748B),
                           fontSize: 13,
                         ),
                       ),
@@ -339,7 +329,7 @@ class _OtpScreenState extends State<OtpScreen> {
                         Text(
                           'Resend in ${_resendCooldown}s',
                           style: const TextStyle(
-                            color: Color(0xFF3B82F6),
+                            color: Color(0xFF0F172A),
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -361,7 +351,7 @@ class _OtpScreenState extends State<OtpScreen> {
                               : const Text(
                                   'Resend Code',
                                   style: TextStyle(
-                                    color: Color(0xFF3B82F6),
+                                    color: Color(0xFF0F172A),
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
                                   ),

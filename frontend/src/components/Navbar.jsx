@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Download, LayoutDashboard, LogOut, User, ChevronDown, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Download, LayoutDashboard, LogOut, User, ChevronDown, ArrowRight } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import BrandLogo from './BrandLogo';
 
 export default function Navbar({ auth, onSignOut }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -31,7 +32,7 @@ export default function Navbar({ auth, onSignOut }) {
             className="flex items-center gap-3 cursor-pointer group"
           >
             <div className="w-10 h-10 bg-slate-950 rounded-2xl flex items-center justify-center shadow-md transition-transform group-hover:scale-105">
-              <ShieldCheck className="w-6 h-6 text-white" />
+              <BrandLogo className="w-6 h-6 text-white" />
             </div>
             <div>
               <span className="text-xl font-black text-slate-950 tracking-tight">
