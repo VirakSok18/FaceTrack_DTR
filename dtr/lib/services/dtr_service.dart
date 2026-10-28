@@ -259,7 +259,8 @@ class DtrService {
     }
   }
 
-  /// Link biometric face and photo to an existing employee created by HR on Web
+  /// Link biometric face registration to an existing employee created by HR on Web.
+  /// NOTE: Preserves HR's official profile photo; NEVER overwrites photo_url from mobile scans.
   Future<bool> linkFaceToEmployee({
     required String workplaceId,
     required String employeeId,
@@ -272,9 +273,8 @@ class DtrService {
         'updated_at': DateTime.now().toIso8601String(),
       };
 
-      if (photoBase64 != null && photoBase64.isNotEmpty) {
-        updateData['photo_url'] = photoBase64;
-      }
+      // HR's uploaded photo on the web dashboard is authoritative and permanent.
+      // Do NOT overwrite photo_url during face registration or scanning.
 
       await _supabase
           .from('dtr_employees')

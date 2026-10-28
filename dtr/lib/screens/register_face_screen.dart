@@ -178,13 +178,6 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
 
       final XFile image = await _controller!.takePicture();
 
-      // Convert image to base64 data URL so HR on web sees the photo immediately
-      String? photoBase64;
-      try {
-        final bytes = await File(image.path).readAsBytes();
-        photoBase64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
-      } catch (_) {}
-
       // 1. Extract and store MobileFaceNet embedding in Supabase using the matched employee's exact database ID
       await FaceRecognitionService().enrollFace(
         workplaceId: _currentRoom!.id,
@@ -192,11 +185,10 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
         imagePath: image.path,
       );
 
-      // 2. Link face & photo directly to existing HR employee record
+      // 2. Mark biometric face enrollment as active on employee record (HR's official profile photo is preserved)
       final linked = await DtrService().linkFaceToEmployee(
         workplaceId: _currentRoom!.id,
         employeeId: matchedEmployee!.employeeId,
-        photoBase64: photoBase64,
       );
 
       if (!linked) {
