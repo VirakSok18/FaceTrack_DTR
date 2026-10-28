@@ -34,15 +34,9 @@ export default function Navbar({ auth, onSignOut }) {
               <ShieldCheck className="w-6 h-6 text-white" />
             </div>
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xl font-black text-slate-950 tracking-tight">FaceTrack</span>
-                <span className="text-xs font-black uppercase tracking-wider bg-slate-100 text-slate-900 px-2 py-0.5 rounded-lg border border-slate-200">
-                  DTR
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                Facial Attendance & Registry
-              </p>
+              <span className="text-xl font-black text-slate-950 tracking-tight">
+                FaceTrack (DTR)
+              </span>
             </div>
           </div>
 

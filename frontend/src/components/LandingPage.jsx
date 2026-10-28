@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, ShieldCheck, Cpu, Building2, CheckCircle2, Sparkles, Clock, ArrowRight, Smartphone, Lock, Eye } from 'lucide-react';
+import { Download, ShieldCheck, Cpu, Building2, CheckCircle2, Clock, Smartphone, Lock, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function LandingPage({ auth }) {
@@ -12,14 +12,6 @@ export default function LandingPage({ auth }) {
         {/* Glow / Subtle Ambient Element */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-slate-100 rounded-full blur-3xl -z-10 pointer-events-none opacity-60" />
 
-        {/* Top Chip */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200 shadow-sm mb-8 animate-fade-in">
-          <Sparkles className="w-3.5 h-3.5 text-slate-900" />
-          <span className="text-xs font-bold text-slate-900 tracking-wide uppercase">
-            MobileFaceNet AI • 100% Serverless
-          </span>
-        </div>
-
         {/* Hero Title */}
         <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black text-slate-950 tracking-tight leading-[1.08] max-w-4xl mx-auto mb-6">
           Smart Facial Attendance for Modern Workplaces.
@@ -30,29 +22,16 @@ export default function LandingPage({ auth }) {
           Touchless on-device biometric check-in with real-time HR tracking. Zero servers to manage, 100% serverless powered by Supabase.
         </p>
 
-        {/* Call to Actions (Rounded Pills) */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto mb-16">
-          {/* Main Download Button */}
+        {/* Call to Action (Download Button) */}
+        <div className="flex items-center justify-center max-w-md mx-auto mb-16">
           <a
             href="/facetrack.apk"
             download="facetrack.apk"
-            className="w-full sm:w-auto flex items-center justify-center gap-3 bg-slate-950 hover:bg-slate-800 text-white px-8 py-4 rounded-full font-bold text-sm shadow-xl hover:shadow-2xl transition-all duration-200 hover:-translate-y-0.5 group"
+            className="flex items-center justify-center gap-3 bg-slate-950 hover:bg-slate-800 text-white px-8 py-4 rounded-full font-bold text-sm shadow-xl hover:shadow-2xl transition-all duration-200 hover:-translate-y-0.5 group"
           >
             <Download className="w-4 h-4 transition-transform group-hover:scale-110" />
             <span>Download Android APK</span>
-            <span className="text-[11px] font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full ml-1">
-              v1.0 (44MB)
-            </span>
           </a>
-
-          {/* Web Dashboard CTA */}
-          <button
-            onClick={() => navigate(auth ? '/dashboard' : '/login')}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 px-7 py-4 rounded-full font-bold text-sm shadow-sm hover:shadow transition-all duration-200"
-          >
-            <span>{auth ? 'Go to Dashboard' : 'HR Web Portal'}</span>
-            <ArrowRight className="w-4 h-4 text-slate-500" />
-          </button>
         </div>
 
         {/* Interactive Kiosk Mockup Card (White & Black Rounded-3xl) */}
@@ -188,29 +167,22 @@ export default function LandingPage({ auth }) {
       <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="bg-slate-950 text-white rounded-3xl p-8 sm:p-14 text-center relative overflow-hidden shadow-2xl">
           <div className="max-w-2xl mx-auto space-y-6 relative z-10">
-            <h2 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight">
+            <h2 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight text-white !text-white">
               Ready to modernize your team's time tracking?
             </h2>
             <p className="text-slate-400 text-sm sm:text-base leading-relaxed">
               Download FaceTrack DTR for Android, place a phone or tablet at your office entrance, and enable touchless check-ins in under 60 seconds.
             </p>
 
-            <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="pt-4 flex items-center justify-center">
               <a
                 href="/facetrack.apk"
                 download="facetrack.apk"
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 bg-white text-slate-950 hover:bg-slate-100 px-8 py-4 rounded-full font-bold text-sm shadow-xl transition-all duration-200 hover:-translate-y-0.5"
+                className="inline-flex items-center justify-center gap-2.5 bg-white text-slate-950 hover:bg-slate-100 px-8 py-4 rounded-full font-bold text-sm shadow-xl transition-all duration-200 hover:-translate-y-0.5"
               >
                 <Download className="w-4 h-4 text-slate-950" />
-                <span>Download Android APK (44.7 MB)</span>
+                <span>Download Android APK</span>
               </a>
-
-              <button
-                onClick={() => navigate(auth ? '/dashboard' : '/login')}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-transparent hover:bg-white/10 text-white border border-white/20 px-6 py-4 rounded-full font-bold text-sm transition-all"
-              >
-                <span>{auth ? 'Open Dashboard' : 'Sign In with Account'}</span>
-              </button>
             </div>
           </div>
         </div>
