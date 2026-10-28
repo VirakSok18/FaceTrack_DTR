@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Upload, X, Save, Camera, FileText, CheckCircle2, Clock, ArrowLeft, Loader2 } from 'lucide-react';
+import { Upload, X, Save, Camera, FileText, CheckCircle2, Clock, ArrowLeft, Loader2, ShieldAlert } from 'lucide-react';
 import TimePicker from './TimePicker';
 import { API_URL } from '../lib/api';
+import { supabase, addEmployeeToRoom } from '../lib/supabase';
 
-function AddEmployeeForm({ onEmployeeAdded, onCancel }) {
+const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+
+function AddEmployeeForm({ selectedOffice, onEmployeeAdded, onCancel }) {
   const [formData, setFormData] = useState({
     name: '',
     role: 'Software Engineer',
@@ -28,6 +31,7 @@ function AddEmployeeForm({ onEmployeeAdded, onCancel }) {
   const [contract, setContract] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState(null);
 
   // Helper to calculate age dynamically
   const calculateAge = (dobString) => {
@@ -55,45 +59,91 @@ function AddEmployeeForm({ onEmployeeAdded, onCancel }) {
     setFormData({ ...formData, workDays: newDays });
   };
 
-  const handleSubmit = async () => {
-    if (!formData.name || !photo || !formData.dateOfBirth || !formData.startDate || !formData.contact || !formData.phone) {
-      alert('Please fill in all core required fields (Name, Photo, Date of Birth, Start Date, Email, Phone)');
+  const handleSubmit = async (e) => {
+    if (e) e.preventDefault();
+    setFormError(null);
+
+    // Sanitize and validate inputs
+    const cleanName = (formData.name || '').replace(/[<>]/g, '').trim().slice(0, 60);
+    const cleanContact = (formData.contact || '').trim().toLowerCase().slice(0, 254);
+    const cleanPhone = (formData.phone || '').replace(/[^\d+ ()-]/g, '').trim().slice(0, 25);
+
+    if (!cleanName) {
+      setFormError('Please enter a valid staff name.');
+      return;
+    }
+    if (!photo) {
+      setFormError('Please provide a staff facial photo for biometric verification.');
+      return;
+    }
+    if (!formData.dateOfBirth || !formData.startDate) {
+      setFormError('Please fill in Date of Birth and Start Date.');
+      return;
+    }
+    if (!cleanContact || !EMAIL_REGEX.test(cleanContact)) {
+      setFormError('Please enter a valid email address.');
+      return;
+    }
+    if (!cleanPhone || cleanPhone.length < 5) {
+      setFormError('Please enter a valid phone number.');
       return;
     }
 
     setIsSubmitting(true);
-    const data = new FormData();
-    Object.keys(formData).forEach(key => {
-      if (key === 'workDays') {
-        data.append(key, JSON.stringify(formData[key]));
-      } else {
-        data.append(key, formData[key]);
-      }
-    });
-
-    // Append files
-    if (photo) data.append('photo', photo);
-    if (cv) data.append('cv', cv);
-    if (nationalIdFile) data.append('nationalIdFile', nationalIdFile);
-    if (passportFile) data.append('passportFile', passportFile);
-    if (nssfFile) data.append('nssfFile', nssfFile);
-    if (contract) data.append('contract', contract);
 
     try {
-      const res = await fetch(`${API_URL}/employees`, {
-        method: 'POST',
-        body: data
-      });
+      // 1. Generate Employee ID
+      const employeeId = `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to create employee');
+      // 2. Direct Supabase Storage / Database Insert if selectedOffice is provided
+      if (selectedOffice?.id) {
+        await addEmployeeToRoom(selectedOffice.id, {
+          employeeId,
+          name: cleanName,
+          role: formData.role,
+          phone: cleanPhone,
+          shiftStart: formData.shiftStart,
+          shiftEnd: formData.shiftEnd,
+          workDays: formData.workDays,
+        });
+      }
+
+      // 3. Fallback to Local Node Backend if running
+      try {
+        const data = new FormData();
+        Object.keys(formData).forEach(key => {
+          if (key === 'workDays') {
+            data.append(key, JSON.stringify(formData[key]));
+          } else if (key === 'name') {
+            data.append(key, cleanName);
+          } else if (key === 'contact') {
+            data.append(key, cleanContact);
+          } else if (key === 'phone') {
+            data.append(key, cleanPhone);
+          } else {
+            data.append(key, formData[key]);
+          }
+        });
+        data.append('employeeId', employeeId);
+        if (photo) data.append('photo', photo);
+        if (cv) data.append('cv', cv);
+        if (nationalIdFile) data.append('nationalIdFile', nationalIdFile);
+        if (passportFile) data.append('passportFile', passportFile);
+        if (nssfFile) data.append('nssfFile', nssfFile);
+        if (contract) data.append('contract', contract);
+
+        await fetch(`${API_URL}/employees`, {
+          method: 'POST',
+          body: data
+        });
+      } catch (_) {
+        // Node backend is optional in cloud mode
       }
 
       onEmployeeAdded();
     } catch (error) {
       console.error('Error adding employee:', error);
-      alert(error.message);
+      setFormError(error.message || 'Failed to enroll employee.');
     } finally {
       setIsSubmitting(false);
     }
@@ -104,34 +154,52 @@ function AddEmployeeForm({ onEmployeeAdded, onCancel }) {
       <div className="flex items-center justify-between">
         <button
           onClick={onCancel}
-          className="flex items-center gap-2 text-slate-700 hover:text-black transition-all font-bold group bg-white px-5 py-2.5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md"
+          className="flex items-center gap-2 text-neutral-700 hover:text-black transition-all font-bold group bg-white px-5 py-2.5 rounded-full border border-neutral-200/90 shadow-sm hover:shadow-md text-xs"
         >
-          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" /> Back to List
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span>Back to Dashboard</span>
         </button>
+
+        {selectedOffice && (
+          <div className="text-xs font-mono font-bold bg-neutral-100 text-black border border-neutral-200 px-3 py-1.5 rounded-full">
+            Office: {selectedOffice.name} ({selectedOffice.code})
+          </div>
+        )}
       </div>
 
-      <div className="glass-card rounded-[2.5rem] p-10 border-none relative overflow-hidden bg-white/40">
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Add Employees</h2>
-          <p className="text-slate-500 font-medium mt-1">Register a new team member to the portal.</p>
+      {formError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-3xl text-red-700 text-xs flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4 shrink-0 text-red-600" />
+          <span>{formError}</span>
+        </div>
+      )}
+
+      <div className="bg-white rounded-3xl p-8 sm:p-10 border border-neutral-200/90 shadow-xl shadow-neutral-100">
+        <div className="mb-8 pb-6 border-b border-neutral-100">
+          <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">Add Team Member</h2>
+          <p className="text-neutral-500 text-xs font-medium mt-1">Register a new employee for facial biometric attendance.</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          {/* Profile Intake */}
-          <div className="lg:col-span-4 space-y-8">
-            <div className="relative group mx-auto w-56 h-56">
-              <div className={`w-full h-full rounded-[2.5rem] overflow-hidden border-4 transition-all duration-300 flex items-center justify-center ${photoPreview ? 'border-slate-800 shadow-2xl shadow-slate-200' : 'border-dashed border-slate-300 bg-white'
-                }`}>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          {/* Profile Photo Intake */}
+          <div className="lg:col-span-4 flex flex-col items-center justify-center">
+            <div className="relative group w-52 h-52">
+              <div className={`w-full h-full rounded-3xl overflow-hidden border-2 transition-all duration-300 flex items-center justify-center ${
+                photoPreview ? 'border-black shadow-xl shadow-neutral-200' : 'border-dashed border-neutral-300 bg-neutral-50'
+              }`}>
                 {photoPreview ? (
                   <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
                 ) : (
                   <div className="text-center p-6 space-y-2">
-                    <Camera className="w-10 h-10 text-slate-300 mx-auto" />
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest block">Upload Photo <span className="text-rose-500">*</span></span>
+                    <Camera className="w-10 h-10 text-neutral-400 mx-auto" />
+                    <span className="text-xs font-bold text-neutral-600 uppercase tracking-wider block">
+                      Facial Photo <span className="text-rose-500">*</span>
+                    </span>
+                    <span className="text-[10px] text-neutral-400 block">Click to upload JPG / PNG</span>
                   </div>
                 )}
               </div>
-              <div className="absolute inset-0 bg-slate-900/40 rounded-[2.5rem] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+              <div className="absolute inset-0 bg-black/40 rounded-3xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                 <Upload className="w-8 h-8 text-white" />
               </div>
               <input
@@ -141,25 +209,34 @@ function AddEmployeeForm({ onEmployeeAdded, onCancel }) {
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
             </div>
+            <p className="text-[11px] text-neutral-400 font-medium text-center mt-3 max-w-[200px]">
+              Front-facing photo required for AI biometric kiosk recognition
+            </p>
           </div>
 
-          {/* Data Intake */}
-          <div className="lg:col-span-8 space-y-10">
-            <section className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {/* Core Data Inputs */}
+          <div className="lg:col-span-8 space-y-6">
+            <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Legal Name <span className="text-rose-500">*</span></label>
+                <label className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider ml-1">
+                  Full Name <span className="text-rose-500">*</span>
+                </label>
                 <input
                   required
-                  className="input-field"
+                  maxLength={60}
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-300 rounded-2xl text-xs font-semibold text-black placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Full operational name"
+                  placeholder="e.g. Sok Sovan"
                 />
               </div>
+
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Designation</label>
+                <label className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider ml-1">
+                  Designation / Role
+                </label>
                 <select
-                  className="input-field"
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-300 rounded-2xl text-xs font-semibold text-black focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 >
@@ -171,48 +248,67 @@ function AddEmployeeForm({ onEmployeeAdded, onCancel }) {
                   <option value="HR Manager">HR Manager</option>
                   <option value="Accountant">Accountant</option>
                   <option value="Support Specialist">Support Specialist</option>
+                  <option value="Staff">Staff</option>
                 </select>
               </div>
-              <div className="space-y-1.5 min-w-0">
+
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Date of Birth <span className="text-rose-500">*</span></label>
+                  <label className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider ml-1">
+                    Date of Birth <span className="text-rose-500">*</span>
+                  </label>
                   {currentAge && (
-                    <span className="text-xs font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold text-neutral-600 bg-neutral-100 px-2 py-0.5 rounded-full">
                       {currentAge} yrs
                     </span>
                   )}
                 </div>
                 <input
                   type="date"
-                  className="input-field"
+                  required
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-300 rounded-2xl text-xs font-semibold text-black focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                   value={formData.dateOfBirth}
                   onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
                 />
               </div>
+
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Email Hub <span className="text-rose-500">*</span></label>
+                <label className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider ml-1">
+                  Email Address <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="email"
-                  className="input-field"
+                  required
+                  maxLength={254}
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-300 rounded-2xl text-xs font-semibold text-black placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                   value={formData.contact}
                   onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
-                  placeholder="corporate@domain.com"
+                  placeholder="employee@company.com"
                 />
               </div>
+
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Primary Mobile <span className="text-rose-500">*</span></label>
+                <label className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider ml-1">
+                  Mobile Phone <span className="text-rose-500">*</span>
+                </label>
                 <input
-                  className="input-field"
+                  required
+                  maxLength={25}
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-300 rounded-2xl text-xs font-semibold text-black placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+1 (000) 000-0000"
+                  placeholder="+855 12 345 678"
                 />
               </div>
+
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Start Timeline <span className="text-rose-500">*</span></label>
+                <label className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider ml-1">
+                  Start Date <span className="text-rose-500">*</span>
+                </label>
                 <input
                   type="date"
-                  className="input-field"
+                  required
+                  className="w-full px-4 py-2.5 bg-neutral-50 border border-neutral-300 rounded-2xl text-xs font-semibold text-black focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all"
                   value={formData.startDate}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                 />
@@ -222,23 +318,25 @@ function AddEmployeeForm({ onEmployeeAdded, onCancel }) {
         </div>
       </div>
 
-      <section className="p-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
-        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
-          <Clock className="w-4 h-4 text-slate-900" /> Basic Schedule
+      {/* Schedule Configuration */}
+      <section className="p-8 bg-white rounded-3xl border border-neutral-200/90 shadow-xl shadow-neutral-100 space-y-6">
+        <h4 className="text-xs font-black text-black uppercase tracking-wider flex items-center gap-2">
+          <Clock className="w-4 h-4 text-black" /> Work Schedule & Shift Hours
         </h4>
         <div className="space-y-6">
           <div>
-            <div className="text-xs text-slate-600 font-bold mb-3 uppercase tracking-tighter">Working Days</div>
+            <div className="text-xs text-neutral-600 font-bold mb-3 uppercase tracking-wider">Working Days</div>
             <div className="flex flex-wrap gap-2">
               {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
                 <button
                   key={day}
                   type="button"
                   onClick={() => toggleDay(day)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all uppercase tracking-tight ${formData.workDays.includes(day)
-                    ? 'bg-slate-900 text-white shadow-lg shadow-slate-200'
-                    : 'bg-white text-slate-400 border border-slate-200 hover:border-slate-300'
-                    }`}
+                  className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${
+                    formData.workDays.includes(day)
+                      ? 'bg-black text-white shadow-sm'
+                      : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200/70 border border-neutral-200'
+                  }`}
                 >
                   {day}
                 </button>
@@ -260,186 +358,31 @@ function AddEmployeeForm({ onEmployeeAdded, onCancel }) {
         </div>
       </section>
 
-      <section className="p-8 bg-white rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
-        <h4 className="text-xs font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
-          <FileText className="w-4 h-4 text-slate-900" /> Documents & Attachments
-        </h4>
-
-        <div className="space-y-1.5 min-w-0 mb-6 max-w-sm">
-          <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Nationality Profile</label>
-          <div className="grid grid-cols-2 gap-2 mt-1">
-            <button
-              type="button"
-              onClick={() => setFormData({ ...formData, isForeigner: false, passport: '' })}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all uppercase tracking-widest ${!formData.isForeigner
-                ? 'bg-slate-900 text-white shadow-lg'
-                : 'bg-white text-slate-400 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-            >
-              Local (Cambodia)
-            </button>
-            <button
-              type="button"
-              onClick={() => setFormData({ ...formData, isForeigner: true, nationalId: '' })}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all uppercase tracking-widest ${formData.isForeigner
-                ? 'bg-slate-900 text-white shadow-lg'
-                : 'bg-white text-slate-400 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-            >
-              Foreigner
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-          {/* CV Upload */}
-          <div className="relative group">
-            <input
-              type="file"
-              accept=".pdf,.doc,.docx"
-              onChange={(e) => setCv(e.target.files[0])}
-              className="hidden"
-              id="cv-upload"
-            />
-            <label
-              htmlFor="cv-upload"
-              className={`flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${cv ? 'border-slate-800 bg-slate-50' : 'border-slate-200 hover:border-slate-400 bg-white'}`}
-            >
-              <div className={`p-2.5 rounded-lg ${cv ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                <FileText className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-slate-900 truncate">{cv ? cv.name : 'CV (Resume)'}</div>
-                <div className="text-xs text-slate-500 font-medium uppercase tracking-tighter truncate">{cv ? `${(cv.size / 1024 / 1024).toFixed(2)} MB` : 'PDF, DOC'}</div>
-              </div>
-              {cv && <CheckCircle2 className="w-5 h-5 text-slate-900 flex-shrink-0" />}
-            </label>
-          </div>
-
-          {/* Contract Upload */}
-          <div className="relative group">
-            <input
-              type="file"
-              accept=".pdf,.doc,.docx"
-              onChange={(e) => setContract(e.target.files[0])}
-              className="hidden"
-              id="contract-upload"
-            />
-            <label
-              htmlFor="contract-upload"
-              className={`flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${contract ? 'border-slate-800 bg-slate-50' : 'border-slate-200 hover:border-slate-400 bg-white'}`}
-            >
-              <div className={`p-2.5 rounded-lg ${contract ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                <FileText className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-slate-900 truncate">{contract ? contract.name : 'Employment Contract'}</div>
-                <div className="text-xs text-slate-500 font-medium uppercase tracking-tighter truncate">{contract ? `${(contract.size / 1024 / 1024).toFixed(2)} MB` : 'PDF, DOC'}</div>
-              </div>
-              {contract && <CheckCircle2 className="w-5 h-5 text-slate-900 flex-shrink-0" />}
-            </label>
-          </div>
-
-          {/* National ID Upload (Local Only) */}
-          {!formData.isForeigner && (
-            <div className="relative group">
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(e) => setNationalIdFile(e.target.files[0])}
-                className="hidden"
-                id="national-id-upload"
-              />
-              <label
-                htmlFor="national-id-upload"
-                className={`flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${nationalIdFile ? 'border-slate-800 bg-slate-50' : 'border-slate-200 hover:border-slate-400 bg-white'}`}
-              >
-                <div className={`p-2.5 rounded-lg ${nationalIdFile ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-slate-900 truncate">{nationalIdFile ? nationalIdFile.name : 'National ID Scan'}</div>
-                  <div className="text-xs text-slate-500 font-medium uppercase tracking-tighter truncate">{nationalIdFile ? `${(nationalIdFile.size / 1024 / 1024).toFixed(2)} MB` : 'Image, PDF'}</div>
-                </div>
-                {nationalIdFile && <CheckCircle2 className="w-5 h-5 text-slate-900 flex-shrink-0" />}
-              </label>
-            </div>
-          )}
-
-          {/* Passport Upload (Foreigner Only) */}
-          {formData.isForeigner && (
-            <div className="relative group">
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(e) => setPassportFile(e.target.files[0])}
-                className="hidden"
-                id="passport-upload"
-              />
-              <label
-                htmlFor="passport-upload"
-                className={`flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${passportFile ? 'border-slate-800 bg-slate-50' : 'border-slate-200 hover:border-slate-400 bg-white'}`}
-              >
-                <div className={`p-2.5 rounded-lg ${passportFile ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-slate-900 truncate">{passportFile ? passportFile.name : 'Passport Scan'}</div>
-                  <div className="text-xs text-slate-500 font-medium uppercase tracking-tighter truncate">{passportFile ? `${(passportFile.size / 1024 / 1024).toFixed(2)} MB` : 'Image, PDF'}</div>
-                </div>
-                {passportFile && <CheckCircle2 className="w-5 h-5 text-slate-900 flex-shrink-0" />}
-              </label>
-            </div>
-          )}
-
-
-          {/* NSSF Upload */}
-          <div className="relative group md:col-span-2">
-            <input
-              type="file"
-              accept="image/*,.pdf"
-              onChange={(e) => setNssfFile(e.target.files[0])}
-              className="hidden"
-              id="nssf-upload"
-            />
-            <label
-              htmlFor="nssf-upload"
-              className={`flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed transition-all cursor-pointer ${nssfFile ? 'border-slate-800 bg-slate-50' : 'border-slate-200 hover:border-slate-400 bg-white'}`}
-            >
-              <div className={`p-2.5 rounded-lg ${nssfFile ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                <FileText className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-bold text-slate-900 truncate">{nssfFile ? nssfFile.name : 'NSSF Card Scan'}</div>
-                <div className="text-xs text-slate-500 font-medium uppercase tracking-tighter truncate">{nssfFile ? `${(nssfFile.size / 1024 / 1024).toFixed(2)} MB` : 'Image, PDF'}</div>
-              </div>
-              {nssfFile && <CheckCircle2 className="w-5 h-5 text-slate-900 flex-shrink-0" />}
-            </label>
-          </div>
-
-        </div>
-      </section>
-
-      <div className="flex items-center justify-end gap-4 pt-6">
+      {/* Form Submission Actions */}
+      <div className="flex items-center justify-end gap-3 pt-4">
         <button
+          type="button"
           onClick={onCancel}
-          className="btn btn-secondary border border-slate-200 text-slate-700 bg-white hover:bg-slate-50 font-bold"
+          className="px-6 py-3 rounded-full text-xs font-bold text-neutral-600 hover:text-black hover:bg-neutral-100 transition-colors"
         >
-          Back to List
+          Cancel
         </button>
         <button
+          type="button"
           onClick={handleSubmit}
           disabled={isSubmitting}
-          className="btn btn-primary px-10 bg-slate-900 hover:bg-black text-white shadow-xl shadow-slate-200 flex items-center gap-2"
+          className="px-8 py-3 bg-black hover:bg-neutral-800 disabled:opacity-50 text-white rounded-full text-xs font-bold transition-all shadow-md hover:shadow-xl flex items-center gap-2"
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Processing...
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Enrolling Staff Member...</span>
             </>
           ) : (
-            'Add Employees'
+            <>
+              <span>Enroll Employee</span>
+              <CheckCircle2 className="w-4 h-4" />
+            </>
           )}
         </button>
       </div>

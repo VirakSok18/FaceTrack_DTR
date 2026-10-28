@@ -33,6 +33,7 @@ export async function verifyRoomToken(code, token) {
  * Fetch all offices for an authenticated user's email
  */
 export async function fetchUserWorkplaces(email) {
+  if (!email) return [];
   try {
     const { data, error } = await supabase
       .from('dtr_workplaces')
@@ -46,6 +47,45 @@ export async function fetchUserWorkplaces(email) {
     console.error('fetchUserWorkplaces error:', e);
     return [];
   }
+}
+
+/**
+ * Create a new workplace/office for the user (enforces max 3 limit)
+ */
+export async function createWorkplace(name, adminEmail) {
+  const cleanEmail = (adminEmail || '').trim().toLowerCase();
+  if (!cleanEmail) throw new Error('Admin email is required.');
+
+  // Enforce 3 office limit
+  const existing = await fetchUserWorkplaces(cleanEmail);
+  if (existing.length >= 3) {
+    throw new Error('Limit Reached: Maximum 3 offices allowed per account.');
+  }
+
+  // Generate unique DTR room code
+  const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+  let randomSuffix = '';
+  for (let i = 0; i < 4; i++) {
+    randomSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  const code = `DTR-${randomSuffix}`;
+  const cleanName = (name || '').trim().replace(/[<>]/g, '').slice(0, 50) || `Office ${existing.length + 1}`;
+
+  const { data, error } = await supabase
+    .from('dtr_workplaces')
+    .insert([
+      {
+        name: cleanName,
+        code: code,
+        admin_email: cleanEmail,
+        max_free_employees: 50,
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 /**

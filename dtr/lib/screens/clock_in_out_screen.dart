@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'dart:convert';
 import 'dart:ui';
-import '../config/api_config.dart';
 import '../models/workplace.dart';
 import '../services/dtr_service.dart';
 import '../services/face_recognition_service.dart';
@@ -394,14 +392,14 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.location_on, size: 16, color: Color(0xFF3B82F6)),
+                        const Icon(Icons.location_on, size: 16, color: Colors.black),
                         const SizedBox(width: 6),
                         Text(
                           _currentRoom?.name ?? 'Office',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
+                            color: Colors.black,
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -424,12 +422,11 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F172A),
+                        backgroundColor: Colors.black,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: const StadiumBorder(),
+                        elevation: 0,
                       ),
                       child: const Text(
                         'DONE',
@@ -493,7 +490,7 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.5,
-                  color: Color(0xFF3B82F6),
+                  color: Colors.black,
                 ),
               ),
           ],
@@ -616,14 +613,12 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                       child: ElevatedButton(
                         onPressed: isProcessing ? null : scanAndClock,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0F172A),
+                          backgroundColor: Colors.black,
                           foregroundColor: Colors.white,
                           disabledBackgroundColor: const Color(0xFFE2E8F0),
-                          padding: const EdgeInsets.symmetric(vertical: 20),
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 18),
+                          elevation: 0,
+                          shape: const StadiumBorder(),
                         ),
                         child: isProcessing
                             ? const SizedBox(

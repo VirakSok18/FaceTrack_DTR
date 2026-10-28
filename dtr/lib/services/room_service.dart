@@ -61,18 +61,6 @@ class RoomService {
       final list = (data as List)
           .map((row) => Workplace.fromJson(row as Map<String, dynamic>))
           .toList();
-
-      // If user has no rooms yet, also check default demo room
-      if (list.isEmpty) {
-        final demo = await _supabase
-            .from('dtr_workplaces')
-            .select('*')
-            .eq('code', 'DTR-1001')
-            .maybeSingle();
-        if (demo != null) {
-          list.add(Workplace.fromJson(demo));
-        }
-      }
       return list;
     } catch (e) {
       debugPrint('[RoomService] fetchRooms error: $e');

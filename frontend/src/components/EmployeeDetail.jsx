@@ -140,7 +140,7 @@ function EmployeeDetail({ onBack, onUpdate }) {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-10 h-10 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
         <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Phasing employee data...</p>
       </div>
     );
@@ -543,7 +543,7 @@ function EmployeeDetail({ onBack, onUpdate }) {
                               {new Date(entry.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                             <span className="w-4 h-px bg-slate-300/30"></span>
-                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-sm ${entry.clockOut ? 'text-indigo-600 bg-indigo-50 border border-indigo-100/50' : 'text-slate-400 bg-slate-50 border border-slate-100 italic'}`}>
+                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-sm ${entry.clockOut ? 'text-black bg-neutral-100 border border-neutral-200' : 'text-neutral-400 bg-neutral-50 border border-neutral-100 italic'}`}>
                               {entry.clockOut ? new Date(entry.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Live'}
                             </span>
                           </div>
@@ -590,7 +590,7 @@ const getStatusStyle = (status) => {
   switch (status?.toLowerCase()) {
     case 'late': return 'bg-amber-50 text-amber-600 border border-amber-100';
     case 'absent': return 'bg-rose-50 text-rose-600 border border-rose-100';
-    case 'half day': return 'bg-blue-50 text-blue-600 border border-blue-100';
+    case 'half day': return 'bg-neutral-100 text-neutral-800 border border-neutral-200';
     default: return 'bg-emerald-50 text-emerald-600 border border-emerald-100';
   }
 };

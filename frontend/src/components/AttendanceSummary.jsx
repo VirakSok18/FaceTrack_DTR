@@ -153,7 +153,7 @@ function AttendanceSummary({ employees }) {
                                         {record.clockOut ? new Date(record.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className="text-indigo-600 font-black text-sm">
+                                        <span className="text-black font-black text-sm">
                                             {record.workedHours ? `${record.workedHours.toFixed(1)}h` : '--'}
                                         </span>
                                     </td>
