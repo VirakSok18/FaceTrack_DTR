@@ -223,6 +223,75 @@ class DtrService {
     }
   }
 
+  /// Find employee by ID in the specified office
+  Future<Employee?> findEmployeeInRoom({
+    required String workplaceId,
+    required String employeeId,
+  }) async {
+    final cleanId = employeeId.trim();
+    if (cleanId.isEmpty) return null;
+    try {
+      final data = await _supabase
+          .from('dtr_employees')
+          .select('*')
+          .eq('workplace_id', workplaceId)
+          .ilike('employee_id', cleanId)
+          .maybeSingle();
+
+      if (data == null) return null;
+      return Employee.fromJson(data);
+    } catch (e) {
+      debugPrint('[DtrService] findEmployeeInRoom error: $e');
+      return null;
+    }
+  }
+
+  /// Link biometric face and photo to an existing employee created by HR on Web
+  Future<bool> linkFaceToEmployee({
+    required String workplaceId,
+    required String employeeId,
+    String? photoBase64,
+  }) async {
+    final cleanId = employeeId.trim();
+    try {
+      final updateData = <String, dynamic>{
+        'is_registered': true,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+
+      if (photoBase64 != null && photoBase64.isNotEmpty) {
+        updateData['photo_url'] = photoBase64;
+      }
+
+      await _supabase
+          .from('dtr_employees')
+          .update(updateData)
+          .eq('workplace_id', workplaceId)
+          .ilike('employee_id', cleanId);
+
+      // If photo provided and python face server reachable, send to register-face
+      if (photoBase64 != null && photoBase64.isNotEmpty) {
+        try {
+          await http
+              .post(
+                Uri.parse(ApiConfig.registerFace),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'employeeId': cleanId,
+                  'photo': photoBase64,
+                }),
+              )
+              .timeout(const Duration(seconds: 5));
+        } catch (_) {}
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('[DtrService] linkFaceToEmployee error: $e');
+      return false;
+    }
+  }
+
   /// Register an employee and their face for a specific room
   Future<bool> registerEmployee({
     required String workplaceId,

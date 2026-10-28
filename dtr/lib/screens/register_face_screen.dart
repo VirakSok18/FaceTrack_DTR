@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import '../models/employee.dart';
 import '../models/workplace.dart';
 import '../services/dtr_service.dart';
 import '../services/face_recognition_service.dart';
@@ -17,13 +21,16 @@ class RegisterFaceScreen extends StatefulWidget {
 class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
   CameraController? _controller;
   List<CameraDescription>? cameras;
+  bool isCameraLoading = true;
   bool isLoading = false;
-  String message = 'System ready for registration';
-  String subMessage = 'Align face to capture biometric data';
+  String message = 'Align face within frame';
+  String subMessage = 'Position face clearly with good lighting';
 
   final TextEditingController employeeIdController = TextEditingController();
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController roleController = TextEditingController(text: 'Employee');
+  Employee? matchedEmployee;
+  bool isSearchingEmployee = false;
+  String? searchError;
+  Timer? _debounceTimer;
 
   Workplace? _currentRoom;
 
@@ -43,7 +50,8 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
   }
 
   Future<void> initCamera() async {
-    // Delay to let previous screen release camera hardware
+    setState(() => isCameraLoading = true);
+    // Allow previous screen to release camera hardware
     await Future.delayed(const Duration(milliseconds: 500));
 
     if (_controller != null) {
@@ -57,8 +65,9 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
       cameras = await availableCameras();
       if (cameras == null || cameras!.isEmpty) {
         setState(() {
-          message = 'Hardware Error';
+          message = 'Camera Unavailable';
           subMessage = 'No camera modules detected';
+          isCameraLoading = false;
         });
         return;
       }
@@ -78,32 +87,74 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
       );
 
       await _controller!.initialize();
-      if (mounted) setState(() {});
+      if (mounted) setState(() => isCameraLoading = false);
     } catch (e) {
-      setState(() {
-        message = 'Camera Initialization Failed';
-        subMessage = 'Check system camera permissions';
-      });
+      if (mounted) {
+        setState(() {
+          message = 'Camera Init Failed';
+          subMessage = 'Check system camera permissions';
+          isCameraLoading = false;
+        });
+      }
     }
+  }
+
+  void _onIdChanged(String value) {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+
+    final cleanId = value.trim();
+    if (cleanId.isEmpty) {
+      setState(() {
+        matchedEmployee = null;
+        searchError = null;
+        isSearchingEmployee = false;
+      });
+      return;
+    }
+
+    setState(() {
+      isSearchingEmployee = true;
+      searchError = null;
+    });
+
+    _debounceTimer = Timer(const Duration(milliseconds: 350), () async {
+      if (_currentRoom == null) return;
+      final emp = await DtrService().findEmployeeInRoom(
+        workplaceId: _currentRoom!.id,
+        employeeId: cleanId,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        isSearchingEmployee = false;
+        if (emp != null) {
+          matchedEmployee = emp;
+          searchError = null;
+        } else {
+          matchedEmployee = null;
+          searchError = 'ID not found in this office. HR must add you on web first.';
+        }
+      });
+    });
   }
 
   Future<void> registerFace() async {
     final empId = employeeIdController.text.trim();
-    final name = nameController.text.trim();
-    final role = roleController.text.trim();
 
     if (empId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter an Employee ID')),
+        const SnackBar(content: Text('Please enter your Employee ID')),
       );
       return;
     }
-    if (name.isEmpty) {
+
+    if (matchedEmployee == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter Employee Full Name')),
+        const SnackBar(content: Text('Please enter a valid Employee ID from HR')),
       );
       return;
     }
+
     if (_currentRoom == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No active office selected')),
@@ -114,49 +165,63 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
     setState(() {
       isLoading = true;
       message = 'Processing Biometrics';
-      subMessage = 'Extracting MobileFaceNet feature vectors...';
+      subMessage = 'Extracting facial feature vector...';
     });
 
     try {
       if (_controller == null || !_controller!.value.isInitialized) {
-        throw 'Camera is not initialized. Please retry.';
+        throw 'Camera is not ready. Please try again.';
       }
 
       final XFile image = await _controller!.takePicture();
 
-      // 1. Save employee profile in Supabase
-      final success = await DtrService().registerEmployee(
-        workplaceId: _currentRoom!.id,
-        employeeId: empId,
-        name: name,
-        role: role.isEmpty ? 'Employee' : role,
-      );
+      // Convert image to base64 data URL so HR on web sees the photo immediately
+      String? photoBase64;
+      try {
+        final bytes = await File(image.path).readAsBytes();
+        photoBase64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      } catch (_) {}
 
-      if (!success) {
-        throw 'Could not save employee to office database';
-      }
-
-      // 2. Extract and enroll on-device MobileFaceNet embedding in Supabase
+      // 1. Extract and store MobileFaceNet embedding in Supabase
       await FaceRecognitionService().enrollFace(
         workplaceId: _currentRoom!.id,
         employeeId: empId,
         imagePath: image.path,
       );
 
+      // 2. Link face & photo directly to existing HR employee record
+      final linked = await DtrService().linkFaceToEmployee(
+        workplaceId: _currentRoom!.id,
+        employeeId: empId,
+        photoBase64: photoBase64,
+      );
+
+      if (!linked) {
+        throw 'Failed to update employee status in database';
+      }
+
       setState(() => isLoading = false);
       if (mounted) {
-        _showSuccessSheet('$name ($empId) enrolled with MobileFaceNet biometrics');
+        _showSuccessSheet(matchedEmployee!.name, empId);
       }
     } catch (e) {
-      setState(() {
-        message = 'Enrollment Failed';
-        subMessage = '$e';
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          message = 'Enrollment Failed';
+          subMessage = '$e';
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$e'),
+            backgroundColor: Colors.black,
+          ),
+        );
+      }
     }
   }
 
-  void _showSuccessSheet(String subText) {
+  void _showSuccessSheet(String empName, String empId) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -167,80 +232,87 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
           child: Container(
             decoration: const BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(36)),
             ),
-            padding: const EdgeInsets.fromLTRB(32, 24, 32, 40),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 50,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(10),
+            padding: const EdgeInsets.fromLTRB(32, 24, 32, 36),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(height: 28),
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(26),
+                  ),
+                  child: const Icon(Icons.check_rounded, color: Colors.white, size: 36),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'FACE ENROLLED SUCCESSFULLY',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  empName,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black,
+                    letterSpacing: -0.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'ID: $empId • Ready for Biometric Face Scan',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      if (_controller != null) {
+                        await _controller!.dispose();
+                        _controller = null;
+                      }
+                      if (mounted) {
+                        Navigator.pop(context); // Close sheet
+                        Navigator.pop(context); // Return to scanner
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: const StadiumBorder(),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'RETURN TO SCANNER',
+                      style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.0),
                     ),
                   ),
-                  const SizedBox(height: 32),
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'ENROLLMENT SUCCESSFUL',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
-                      color: Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    subText,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black,
-                      letterSpacing: -0.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 36),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        if (_controller != null) {
-                          await _controller!.dispose();
-                          _controller = null;
-                        }
-                        if (mounted) {
-                          Navigator.pop(context); // Close sheet
-                          Navigator.pop(context); // Go back to kiosk
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: const StadiumBorder(),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'RETURN TO SCANNER',
-                        style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -250,10 +322,9 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _controller?.dispose();
     employeeIdController.dispose();
-    nameController.dispose();
-    roleController.dispose();
     super.dispose();
   }
 
@@ -261,25 +332,27 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: false, // Guarantees camera and register button never scroll or clip!
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
+        centerTitle: true,
         title: Column(
           children: [
             const Text(
-              'FACE ENROLLMENT',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black),
+              'REGISTER FACE',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Colors.black, letterSpacing: 0.5),
             ),
             if (_currentRoom != null)
               Text(
-                'OFFICE: ${_currentRoom!.name.toUpperCase()}',
+                _currentRoom!.name.toUpperCase(),
                 style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
               ),
           ],
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Colors.black),
           onPressed: () async {
             if (_controller != null) {
               await _controller!.dispose();
@@ -289,19 +362,18 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
           },
         ),
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: SingleChildScrollView(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 550),
             child: Column(
               children: [
-                // Camera Preview Container
-                Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: AspectRatio(
-                    aspectRatio: 3 / 4,
+                // 1. Camera Viewport: Expanded so it flexes to fill available vertical space
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(32),
+                      borderRadius: BorderRadius.circular(28),
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
@@ -316,13 +388,43 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                             )
                           else
                             Container(
-                              color: Colors.black12,
-                              child: const Center(child: CircularProgressIndicator(color: Colors.black)),
+                              color: const Color(0xFFF1F5F9),
+                              child: Center(
+                                child: isCameraLoading
+                                    ? const CircularProgressIndicator(color: Colors.black, strokeWidth: 2.5)
+                                    : const Icon(Icons.camera_alt_outlined, color: Color(0xFF94A3B8), size: 48),
+                              ),
                             ),
-                          Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.white24, width: 1.0),
-                              borderRadius: BorderRadius.circular(32),
+
+                          // Face framing corner brackets
+                          CustomPaint(
+                            painter: FramePainter(
+                              color: Colors.white.withOpacity(0.85),
+                            ),
+                          ),
+
+                          // Top Guidance Pill
+                          Positioned(
+                            top: 14,
+                            left: 14,
+                            right: 14,
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.65),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  message.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -331,103 +433,144 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                   ),
                 ),
 
-                // Inputs Container
+                // 2. Control Panel: Employee ID Input, Live Verification Chip & Action Button
+                // ALWAYS visible in frame, NO SCROLLING required
                 Container(
-                  padding: const EdgeInsets.fromLTRB(28, 4, 28, 40),
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Employee ID
+                      // Employee ID Input
                       Container(
                         decoration: BoxDecoration(
                           color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          border: Border.all(
+                            color: matchedEmployee != null
+                                ? Colors.black
+                                : searchError != null
+                                ? Colors.redAccent.withOpacity(0.5)
+                                : const Color(0xFFE2E8F0),
+                            width: matchedEmployee != null ? 1.5 : 1.0,
+                          ),
                         ),
                         child: TextField(
                           controller: employeeIdController,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black),
-                          decoration: const InputDecoration(
-                            labelText: 'EMPLOYEE ID',
-                            labelStyle: TextStyle(
+                          onChanged: _onIdChanged,
+                          textCapitalization: TextCapitalization.characters,
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.black),
+                          decoration: InputDecoration(
+                            labelText: 'EMPLOYEE ID (FROM HR)',
+                            labelStyle: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
                               letterSpacing: 0.8,
                               color: Color(0xFF64748B),
                             ),
-                            hintText: 'e.g. EMP-001',
-                            hintStyle: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
+                            hintText: 'e.g. EMP-1001',
+                            hintStyle: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.all(16),
-                            prefixIcon: Icon(Icons.badge_rounded, color: Colors.black, size: 20),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            prefixIcon: const Icon(Icons.badge_rounded, color: Colors.black, size: 20),
+                            suffixIcon: isSearchingEmployee
+                                ? const Padding(
+                                    padding: EdgeInsets.all(12.0),
+                                    child: SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                                    ),
+                                  )
+                                : matchedEmployee != null
+                                ? const Icon(Icons.check_circle_rounded, color: Colors.black, size: 20)
+                                : null,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
 
-                      // Full Name
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: TextField(
-                          controller: nameController,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black),
-                          decoration: const InputDecoration(
-                            labelText: 'FULL NAME',
-                            labelStyle: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
-                              color: Color(0xFF64748B),
-                            ),
-                            hintText: 'e.g. Sarah Jenkins',
-                            hintStyle: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.all(16),
-                            prefixIcon: Icon(Icons.person_outline_rounded, color: Colors.black, size: 20),
+                      const SizedBox(height: 8),
+
+                      // Live Verified Employee Name Chip / Error Note
+                      if (matchedEmployee != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.person_rounded, color: Colors.white, size: 16),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${matchedEmployee!.name} • ${matchedEmployee!.role}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (matchedEmployee!.isRegistered)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white24,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'UPDATE',
+                                    style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        )
+                      else if (searchError != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 14),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  searchError!,
+                                  style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Text(
+                            'Enter your employee ID created on the HR Web Dashboard',
+                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 12),
 
-                      // Role
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: TextField(
-                          controller: roleController,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black),
-                          decoration: const InputDecoration(
-                            labelText: 'POSITION / ROLE',
-                            labelStyle: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
-                              color: Color(0xFF64748B),
-                            ),
-                            hintText: 'e.g. Senior Designer',
-                            hintStyle: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.all(16),
-                            prefixIcon: Icon(Icons.work_outline_rounded, color: Colors.black, size: 20),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 14),
 
-                      // Submit Button
+                      // Register Face Button (Always visible at the bottom)
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: isLoading ? null : registerFace,
+                          onPressed: (isLoading || matchedEmployee == null) ? null : registerFace,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.black,
                             foregroundColor: Colors.white,
+                            disabledBackgroundColor: const Color(0xFFE2E8F0),
+                            disabledForegroundColor: const Color(0xFF94A3B8),
                             padding: const EdgeInsets.symmetric(vertical: 18),
                             elevation: 0,
                             shape: const StadiumBorder(),
@@ -440,12 +583,14 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                                 )
                               : Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
-                                  children: const [
-                                    Icon(Icons.camera_alt_rounded, size: 20),
-                                    SizedBox(width: 8),
+                                  children: [
+                                    const Icon(Icons.camera_alt_rounded, size: 20),
+                                    const SizedBox(width: 8),
                                     Text(
-                                      'ENROLL IN THIS OFFICE',
-                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1.0),
+                                      matchedEmployee == null
+                                          ? 'ENTER VALID ID FIRST'
+                                          : 'REGISTER BIOMETRIC FACE',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8),
                                     ),
                                   ],
                                 ),
@@ -461,4 +606,68 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
       ),
     );
   }
+}
+
+/// Custom painter for camera target corner brackets
+class FramePainter extends CustomPainter {
+  final Color color;
+
+  FramePainter({this.color = Colors.white});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final rect = Rect.fromLTWH(24, 24, size.width - 48, size.height - 48);
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(28));
+
+    const cornerLength = 36.0;
+
+    // Top Left
+    canvas.drawPath(
+      Path()
+        ..moveTo(rrect.left, rrect.top + cornerLength)
+        ..lineTo(rrect.left, rrect.top + 28)
+        ..arcToPoint(Offset(rrect.left + 28, rrect.top), radius: const Radius.circular(28))
+        ..lineTo(rrect.left + cornerLength, rrect.top),
+      paint,
+    );
+
+    // Top Right
+    canvas.drawPath(
+      Path()
+        ..moveTo(rrect.right - cornerLength, rrect.top)
+        ..lineTo(rrect.right - 28, rrect.top)
+        ..arcToPoint(Offset(rrect.right, rrect.top + 28), radius: const Radius.circular(28))
+        ..lineTo(rrect.right, rrect.top + cornerLength),
+      paint,
+    );
+
+    // Bottom Left
+    canvas.drawPath(
+      Path()
+        ..moveTo(rrect.left, rrect.bottom - cornerLength)
+        ..lineTo(rrect.left, rrect.bottom - 28)
+        ..arcToPoint(Offset(rrect.left + 28, rrect.bottom), radius: const Radius.circular(28), clockwise: false)
+        ..lineTo(rrect.left + cornerLength, rrect.bottom),
+      paint,
+    );
+
+    // Bottom Right
+    canvas.drawPath(
+      Path()
+        ..moveTo(rrect.right - cornerLength, rrect.bottom)
+        ..lineTo(rrect.right - 28, rrect.bottom)
+        ..arcToPoint(Offset(rrect.right, rrect.bottom - 28), radius: const Radius.circular(28), clockwise: false)
+        ..lineTo(rrect.right, rrect.bottom - cornerLength),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
