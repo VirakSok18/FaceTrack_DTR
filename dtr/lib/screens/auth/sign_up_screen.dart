@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/dtr_auth_service.dart';
 import '../../widgets/face_track_logo.dart';
 import '../rooms/room_list_screen.dart';
@@ -17,13 +19,27 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  StreamSubscription<AuthState>? _authSub;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
 
   @override
+  void initState() {
+    super.initState();
+    _authSub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.session != null && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const RoomListScreen()),
+        );
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _authSub?.cancel();
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -90,7 +106,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     try {
       await DtrAuthService().signInWithGoogle();
-      if (mounted) {
+      if (mounted && DtrAuthService().isAuthenticated) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const RoomListScreen()),
         );
