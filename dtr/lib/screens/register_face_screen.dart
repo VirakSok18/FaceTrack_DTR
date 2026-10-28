@@ -117,7 +117,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
       searchError = null;
     });
 
-    _debounceTimer = Timer(const Duration(milliseconds: 350), () async {
+    _debounceTimer = Timer(const Duration(milliseconds: 300), () async {
       if (_currentRoom == null) return;
       final emp = await DtrService().findEmployeeInRoom(
         workplaceId: _currentRoom!.id,
@@ -132,25 +132,25 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
           searchError = null;
         } else {
           matchedEmployee = null;
-          searchError = 'ID not found in this office. HR must add you on web first.';
+          searchError = 'Code "$cleanId" not found in this office.';
         }
       });
     });
   }
 
   Future<void> registerFace() async {
-    final empId = employeeIdController.text.trim();
+    final rawInput = employeeIdController.text.trim();
 
-    if (empId.isEmpty) {
+    if (rawInput.isEmpty && matchedEmployee == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your Employee ID')),
+        const SnackBar(content: Text('Please enter your Employee Code')),
       );
       return;
     }
 
     if (matchedEmployee == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid Employee ID from HR')),
+        const SnackBar(content: Text('Please enter a valid Employee Code from HR')),
       );
       return;
     }
@@ -161,6 +161,9 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
       );
       return;
     }
+
+    // Dismiss keyboard before taking photo
+    FocusScope.of(context).unfocus();
 
     setState(() {
       isLoading = true;
@@ -182,17 +185,17 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
         photoBase64 = 'data:image/jpeg;base64,${base64Encode(bytes)}';
       } catch (_) {}
 
-      // 1. Extract and store MobileFaceNet embedding in Supabase
+      // 1. Extract and store MobileFaceNet embedding in Supabase using the matched employee's exact database ID
       await FaceRecognitionService().enrollFace(
         workplaceId: _currentRoom!.id,
-        employeeId: empId,
+        employeeId: matchedEmployee!.employeeId,
         imagePath: image.path,
       );
 
       // 2. Link face & photo directly to existing HR employee record
       final linked = await DtrService().linkFaceToEmployee(
         workplaceId: _currentRoom!.id,
-        employeeId: empId,
+        employeeId: matchedEmployee!.employeeId,
         photoBase64: photoBase64,
       );
 
@@ -202,7 +205,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
 
       setState(() => isLoading = false);
       if (mounted) {
-        _showSuccessSheet(matchedEmployee!.name, empId);
+        _showSuccessSheet(matchedEmployee!.name, matchedEmployee!.employeeId);
       }
     } catch (e) {
       if (mounted) {
@@ -332,7 +335,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      resizeToAvoidBottomInset: false, // Guarantees camera and register button never scroll or clip!
+      resizeToAvoidBottomInset: true, // Pushes up gracefully when keyboard opens!
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
@@ -362,244 +365,274 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
           },
         ),
       ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 550),
-            child: Column(
-              children: [
-                // 1. Camera Viewport: Expanded so it flexes to fill available vertical space
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(28),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          if (_controller != null && _controller!.value.isInitialized)
-                            FittedBox(
-                              fit: BoxFit.cover,
-                              child: SizedBox(
-                                width: _controller!.value.previewSize?.height ?? 1,
-                                height: _controller!.value.previewSize?.width ?? 1,
-                                child: CameraPreview(_controller!),
-                              ),
-                            )
-                          else
-                            Container(
-                              color: const Color(0xFFF1F5F9),
-                              child: Center(
-                                child: isCameraLoading
-                                    ? const CircularProgressIndicator(color: Colors.black, strokeWidth: 2.5)
-                                    : const Icon(Icons.camera_alt_outlined, color: Color(0xFF94A3B8), size: 48),
-                              ),
-                            ),
-
-                          // Face framing corner brackets
-                          CustomPaint(
-                            painter: FramePainter(
-                              color: Colors.white.withOpacity(0.85),
-                            ),
-                          ),
-
-                          // Top Guidance Pill
-                          Positioned(
-                            top: 14,
-                            left: 14,
-                            right: 14,
-                            child: Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.65),
-                                  borderRadius: BorderRadius.circular(20),
+      // Tap outside anywhere to immediately close the keyboard
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        behavior: HitTestBehavior.opaque,
+        child: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 550),
+              child: Column(
+                children: [
+                  // 1. Camera Viewport: Expanded so it flexes and shrinks when keyboard pushes up
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            if (_controller != null && _controller!.value.isInitialized)
+                              FittedBox(
+                                fit: BoxFit.cover,
+                                child: SizedBox(
+                                  width: _controller!.value.previewSize?.height ?? 1,
+                                  height: _controller!.value.previewSize?.width ?? 1,
+                                  child: CameraPreview(_controller!),
                                 ),
-                                child: Text(
-                                  message.toUpperCase(),
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.0,
+                              )
+                            else
+                              Container(
+                                color: const Color(0xFFF1F5F9),
+                                child: Center(
+                                  child: isCameraLoading
+                                      ? const CircularProgressIndicator(color: Colors.black, strokeWidth: 2.5)
+                                      : const Icon(Icons.camera_alt_outlined, color: Color(0xFF94A3B8), size: 48),
+                                ),
+                              ),
+
+                            // Face framing corner brackets
+                            CustomPaint(
+                              painter: FramePainter(
+                                color: Colors.white.withOpacity(0.85),
+                              ),
+                            ),
+
+                            // Top Guidance Pill
+                            Positioned(
+                              top: 14,
+                              left: 14,
+                              right: 14,
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.65),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    message.toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1.0,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                // 2. Control Panel: Employee ID Input, Live Verification Chip & Action Button
-                // ALWAYS visible in frame, NO SCROLLING required
-                Container(
-                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Employee ID Input
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: matchedEmployee != null
-                                ? Colors.black
-                                : searchError != null
-                                ? Colors.redAccent.withOpacity(0.5)
-                                : const Color(0xFFE2E8F0),
-                            width: matchedEmployee != null ? 1.5 : 1.0,
-                          ),
-                        ),
-                        child: TextField(
-                          controller: employeeIdController,
-                          onChanged: _onIdChanged,
-                          textCapitalization: TextCapitalization.characters,
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: Colors.black),
-                          decoration: InputDecoration(
-                            labelText: 'EMPLOYEE ID (FROM HR)',
-                            labelStyle: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.8,
-                              color: Color(0xFF64748B),
+                  // 2. Control Panel: Employee ID Code Input, Live Verification Chip & Action Button
+                  // Automatically pushed up by keyboard, and button remains perfectly positioned
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Employee ID Input (User only needs to enter the code digits!)
+                        Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: matchedEmployee != null
+                                  ? Colors.black
+                                  : searchError != null
+                                  ? Colors.redAccent.withOpacity(0.5)
+                                  : const Color(0xFFE2E8F0),
+                              width: matchedEmployee != null ? 1.5 : 1.0,
                             ),
-                            hintText: 'e.g. EMP-1001',
-                            hintStyle: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            prefixIcon: const Icon(Icons.badge_rounded, color: Colors.black, size: 20),
-                            suffixIcon: isSearchingEmployee
-                                ? const Padding(
-                                    padding: EdgeInsets.all(12.0),
-                                    child: SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
-                                    ),
-                                  )
-                                : matchedEmployee != null
-                                ? const Icon(Icons.check_circle_rounded, color: Colors.black, size: 20)
-                                : null,
                           ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 8),
-
-                      // Live Verified Employee Name Chip / Error Note
-                      if (matchedEmployee != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.black,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.person_rounded, color: Colors.white, size: 16),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '${matchedEmployee!.name} • ${matchedEmployee!.role}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                          child: TextField(
+                            controller: employeeIdController,
+                            onChanged: _onIdChanged,
+                            onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                            textInputAction: TextInputAction.done,
+                            keyboardType: TextInputType.text,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
+                              color: Colors.black,
+                              letterSpacing: 0.5,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'EMPLOYEE CODE',
+                              labelStyle: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                                color: Color(0xFF64748B),
                               ),
-                              if (matchedEmployee!.isRegistered)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white24,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text(
-                                    'UPDATE',
-                                    style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        )
-                      else if (searchError != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 14),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  searchError!,
-                                  style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          child: Text(
-                            'Enter your employee ID created on the HR Web Dashboard',
-                            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-
-                      const SizedBox(height: 14),
-
-                      // Register Face Button (Always visible at the bottom)
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: (isLoading || matchedEmployee == null) ? null : registerFace,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: const Color(0xFFE2E8F0),
-                            disabledForegroundColor: const Color(0xFF94A3B8),
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            elevation: 0,
-                            shape: const StadiumBorder(),
-                          ),
-                          child: isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Icon(Icons.camera_alt_rounded, size: 20),
-                                    const SizedBox(width: 8),
+                              hintText: 'e.g. 1001',
+                              hintStyle: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 14),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              prefixIcon: Container(
+                                padding: const EdgeInsets.only(left: 14, right: 6),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Icon(Icons.badge_rounded, color: Colors.black, size: 20),
+                                    SizedBox(width: 8),
                                     Text(
-                                      matchedEmployee == null
-                                          ? 'ENTER VALID ID FIRST'
-                                          : 'REGISTER BIOMETRIC FACE',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                                      'EMP - ',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF0F172A),
+                                        letterSpacing: 0.5,
+                                      ),
                                     ),
                                   ],
                                 ),
+                              ),
+                              suffixIcon: isSearchingEmployee
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(12.0),
+                                      child: SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(color: Colors.black, strokeWidth: 2),
+                                      ),
+                                    )
+                                  : matchedEmployee != null
+                                  ? const Icon(Icons.check_circle_rounded, color: Colors.black, size: 22)
+                                  : null,
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+
+                        const SizedBox(height: 8),
+
+                        // Live Verified Employee Name Chip / Error Note
+                        if (matchedEmployee != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.person_rounded, color: Colors.white, size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '${matchedEmployee!.name} • ${matchedEmployee!.role}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (matchedEmployee!.isRegistered)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white24,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'UPDATE',
+                                      style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          )
+                        else if (searchError != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 14),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    searchError!,
+                                    style: const TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            child: Text(
+                              'Enter only the code digits (e.g. 1001) from your HR profile',
+                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+
+                        const SizedBox(height: 14),
+
+                        // Register Face Button (Always visible at the bottom)
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: (isLoading || matchedEmployee == null) ? null : registerFace,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black,
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: const Color(0xFFE2E8F0),
+                              disabledForegroundColor: const Color(0xFF94A3B8),
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              elevation: 0,
+                              shape: const StadiumBorder(),
+                            ),
+                            child: isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                  )
+                                : Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(Icons.camera_alt_rounded, size: 20),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        matchedEmployee == null
+                                            ? 'ENTER VALID CODE FIRST'
+                                            : 'REGISTER BIOMETRIC FACE',
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -652,7 +685,7 @@ class FramePainter extends CustomPainter {
       Path()
         ..moveTo(rrect.left, rrect.bottom - cornerLength)
         ..lineTo(rrect.left, rrect.bottom - 28)
-        ..arcToPoint(Offset(rrect.left + 28, rrect.bottom), radius: const Radius.circular(28), clockwise: false)
+        ..arcToPoint(Offset(rrect.left + 30, rrect.bottom), radius: const Radius.circular(28), clockwise: false)
         ..lineTo(rrect.left + cornerLength, rrect.bottom),
       paint,
     );

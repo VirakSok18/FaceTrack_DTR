@@ -223,7 +223,7 @@ class DtrService {
     }
   }
 
-  /// Find employee by ID in the specified office
+  /// Find employee by ID or code in the specified office (supports typing just the code without 'EMP-')
   Future<Employee?> findEmployeeInRoom({
     required String workplaceId,
     required String employeeId,
@@ -231,11 +231,24 @@ class DtrService {
     final cleanId = employeeId.trim();
     if (cleanId.isEmpty) return null;
     try {
+      // Build search variants so user can enter just "1001", "EMP-1001", or custom IDs
+      String idWithPrefix = cleanId;
+      String idWithoutPrefix = cleanId;
+
+      if (cleanId.toUpperCase().startsWith('EMP-')) {
+        idWithoutPrefix = cleanId.substring(4).trim();
+      } else if (cleanId.toUpperCase().startsWith('EMP')) {
+        idWithoutPrefix = cleanId.substring(3).trim();
+      } else {
+        idWithPrefix = 'EMP-$cleanId';
+      }
+
       final data = await _supabase
           .from('dtr_employees')
           .select('*')
           .eq('workplace_id', workplaceId)
-          .ilike('employee_id', cleanId)
+          .or('employee_id.ilike.$cleanId,employee_id.ilike.$idWithPrefix,employee_id.ilike.$idWithoutPrefix')
+          .limit(1)
           .maybeSingle();
 
       if (data == null) return null;
