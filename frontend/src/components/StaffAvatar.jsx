@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getFileUrl } from '../lib/api';
 
 /**
@@ -18,7 +18,13 @@ export function getInitials(name) {
 export default function StaffAvatar({ photo, name, size = 'md', className = '' }) {
   const [imgError, setImgError] = useState(false);
   const initials = getInitials(name);
-  const resolvedUrl = getFileUrl(photo) || (typeof photo === 'string' && photo.trim() ? photo : null);
+
+  // Reset error flag whenever photo prop updates
+  useEffect(() => {
+    setImgError(false);
+  }, [photo]);
+
+  const resolvedUrl = getFileUrl(photo) || (typeof photo === 'string' && photo.trim() ? photo.trim() : null);
 
   const sizeClasses = {
     sm: 'w-8 h-8 text-[11px]',

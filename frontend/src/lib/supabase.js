@@ -19,11 +19,76 @@ export function getLocalDateString(d = new Date()) {
 }
 
 /**
+ * Optimizes an image file using browser HTML5 canvas to a reasonable size (~30-50KB)
+ * so it fits easily within database text fields and loads instantly.
+ */
+export async function optimizeImageFile(file, maxWidth = 600, maxHeight = 600, quality = 0.82) {
+  if (!file) return null;
+  if (typeof file === 'string') return file;
+
+  // Non-images (e.g. PDFs) are not processed through canvas
+  if (file.type && !file.type.startsWith('image/')) {
+    return file;
+  }
+
+  if (typeof window !== 'undefined' && window.Image && window.document) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxWidth || height > maxHeight) {
+            if (width > height) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            } else {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Get optimized base64 JPEG data URL (~30-50KB)
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => {
+          resolve(e.target.result);
+        };
+        img.src = e.target.result;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  return file;
+}
+
+/**
  * Uploads a file to Supabase Storage ('dtr_files' bucket),
  * falling back gracefully to base64 Data URL if storage is restricted.
  */
 export async function uploadEmployeeFile(file, folder = 'avatars') {
   if (!file) return null;
+  if (typeof file === 'string') return file;
+
+  const isImage = (file.type && file.type.startsWith('image/')) || folder === 'avatars';
+  let optimizedDataUrl = null;
+
+  if (isImage) {
+    try {
+      optimizedDataUrl = await optimizeImageFile(file, 600, 600, 0.82);
+    } catch (_) {}
+  }
 
   try {
     const fileExt = file.name ? file.name.split('.').pop() : 'jpg';
@@ -45,7 +110,11 @@ export async function uploadEmployeeFile(file, folder = 'avatars') {
     console.warn('Supabase storage upload error, falling back to base64 data URL:', err);
   }
 
-  // Resilient fallback: Data URL
+  // Resilient fallback: Return optimized data URL or read file
+  if (optimizedDataUrl) {
+    return optimizedDataUrl;
+  }
+
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result);
@@ -191,13 +260,15 @@ export async function fetchEmployeesByRoom(workplaceId) {
 export async function fetchEmployeeById(id) {
   if (!id) return null;
   try {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const cleanId = String(id).trim();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId);
 
     let query = supabase.from('dtr_employees').select('*');
     if (isUuid) {
-      query = query.or(`id.eq.${id},employee_id.eq.${id}`);
+      query = query.or(`id.eq.${cleanId},employee_id.eq.${cleanId}`);
     } else {
-      query = query.eq('employee_id', id);
+      const codeDigits = cleanId.replace(/^EMP-?/i, '');
+      query = query.or(`employee_id.eq.${cleanId},employee_id.eq.EMP-${cleanId},employee_id.eq.EMP-${codeDigits},employee_id.eq.${codeDigits}`);
     }
 
     const { data, error } = await query.maybeSingle();

@@ -1,19 +1,38 @@
 export const getFileUrl = (fileData) => {
     if (!fileData) return null;
     if (typeof fileData === 'string') {
-        // Handle legacy local paths or direct strings
-        if (fileData.startsWith('http')) return fileData;
-        return `http://localhost:5000/uploads/${fileData}`;
+        const trimmed = fileData.trim();
+        // If it's already an absolute URL, base64 data URL, or blob preview URL, return as-is
+        if (
+            trimmed.startsWith('http://') ||
+            trimmed.startsWith('https://') ||
+            trimmed.startsWith('data:') ||
+            trimmed.startsWith('blob:')
+        ) {
+            return trimmed;
+        }
+
+        // Handle local backend relative paths
+        if (trimmed.startsWith('/uploads/')) {
+            return `http://localhost:5000${trimmed}`;
+        }
+        return `http://localhost:5000/uploads/${trimmed.replace(/^\//, '')}`;
     }
     // Handle objects (from Cloudinary or local storage)
     if (fileData.url) {
-        // If URL is already absolute (starts with http), return as-is
-        if (fileData.url.startsWith('http')) return fileData.url;
-        // If URL is relative (starts with /uploads/), construct full URL to backend
-        if (fileData.url.startsWith('/uploads/')) {
-            return `http://localhost:5000${fileData.url}`;
+        const url = String(fileData.url).trim();
+        if (
+            url.startsWith('http://') ||
+            url.startsWith('https://') ||
+            url.startsWith('data:') ||
+            url.startsWith('blob:')
+        ) {
+            return url;
         }
-        return fileData.url;
+        if (url.startsWith('/uploads/')) {
+            return `http://localhost:5000${url}`;
+        }
+        return url;
     }
     return null;
 };

@@ -211,13 +211,24 @@ function App() {
     const newStatuses = {};
 
     for (const emp of employeeList) {
-      // Find today's attendance log for this staff member
-      const empLog = (logs || []).find(
-        (log) =>
+      // Find today's attendance log for this staff member (robust against EMP- prefixes)
+      const empRawId = (emp.employeeId || emp.id || emp._id || '').toString().trim().toLowerCase();
+      const empCleanDigits = empRawId.replace(/^emp-?/i, '');
+
+      const empLog = (logs || []).find((log) => {
+        if (!log.employee_id) return false;
+        const logRawId = log.employee_id.toString().trim().toLowerCase();
+        if (
+          logRawId === empRawId ||
           log.employee_id === emp.employeeId ||
           log.employee_id === emp.id ||
           log.employee_id === emp._id
-      );
+        ) {
+          return true;
+        }
+        const logCleanDigits = logRawId.replace(/^emp-?/i, '');
+        return empCleanDigits && logCleanDigits === empCleanDigits;
+      });
 
       let status = 'Not Scanned Yet';
 
