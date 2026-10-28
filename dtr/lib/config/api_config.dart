@@ -8,8 +8,8 @@ class ApiConfig {
   static const String googleWebClientId =
       '583980575924-q4ellmg3de7hibrhpo04alpr4rf2nm2b.apps.googleusercontent.com';
 
-  // Email Relay for OTP verification
-  static const String emailRelayUrl = 'https://melo-pi-one.vercel.app/api/send-email';
+  // Email Relay for OTP verification (FaceTrack DTR native serverless function)
+  static const String emailRelayUrl = 'https://facetrackdtr.vercel.app/api/send-email';
 
   // HR Web Dashboard Portal URL
   static const String hrWebPortalUrl = 'https://facetrackdtr.vercel.app';
