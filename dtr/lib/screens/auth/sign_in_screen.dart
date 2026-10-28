@@ -4,23 +4,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../services/dtr_auth_service.dart';
 import '../../widgets/face_track_logo.dart';
 import '../rooms/room_list_screen.dart';
-import 'sign_up_screen.dart';
-import 'otp_screen.dart';
 
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({Key? key}) : super(key: key);
+  const SignInScreen({super.key});
 
   @override
-  _SignInScreenState createState() => _SignInScreenState();
+  State<SignInScreen> createState() => _SignInScreenState();
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
   StreamSubscription<AuthState>? _authSub;
-  bool _isLoading = false;
   bool _isGoogleLoading = false;
-  bool _obscurePassword = true;
   String? _errorMessage;
 
   @override
@@ -38,78 +32,7 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   void dispose() {
     _authSub?.cancel();
-    _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
-  }
-
-  Future<void> _handlePasswordSignIn() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-
-    if (email.isEmpty || !email.contains('@')) {
-      setState(() => _errorMessage = 'Please enter a valid email address.');
-      return;
-    }
-    if (password.isEmpty) {
-      setState(() => _errorMessage = 'Please enter your password.');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await DtrAuthService().signInWithEmailPassword(
-        email: email,
-        password: password,
-      );
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const RoomListScreen()),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().contains('Invalid login credentials')
-            ? 'Invalid email or password. You can also sign in with an email code.'
-            : 'Sign in failed: ${e.toString()}';
-      });
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _handleOtpSignIn() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty || !email.contains('@')) {
-      setState(() => _errorMessage = 'Please enter your email to receive a verification code.');
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final sent = await DtrAuthService().sendEmailOtp(email);
-      if (sent && mounted) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => OtpScreen(email: email, isSignUp: false),
-          ),
-        );
-      } else {
-        setState(() => _errorMessage = 'Could not send verification code. Please try again.');
-      }
-    } catch (e) {
-      setState(() => _errorMessage = 'Failed to send code: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
   }
 
   Future<void> _handleGoogleSignIn() async {
@@ -139,35 +62,35 @@ class _SignInScreenState extends State<SignInScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // App Brand Logo
+                  // App Brand Logo Monogram
                   Center(
                     child: Container(
-                      width: 68,
-                      height: 68,
+                      width: 76,
+                      height: 76,
                       decoration: BoxDecoration(
                         color: Colors.black,
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 20,
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 24,
                             offset: const Offset(0, 8),
                           ),
                         ],
                       ),
                       child: const Center(
-                        child: FaceTrackLogo(size: 38, color: Colors.white),
+                        child: FaceTrackLogo(size: 42, color: Colors.white),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 24),
                   const Text(
                     'FaceTrack (DTR)',
                     textAlign: TextAlign.center,
@@ -178,79 +101,17 @@ class _SignInScreenState extends State<SignInScreen> {
                       letterSpacing: -0.6,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   const Text(
-                    'Touchless Facial Attendance & Time Record',
+                    'Touchless Facial Attendance & HR Kiosk',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       color: Color(0xFF64748B),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 28),
-
-                  // Pill Switcher: Sign In vs Create Account
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                    ),
-                    padding: const EdgeInsets.all(4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.black,
-                              borderRadius: BorderRadius.circular(26),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Text(
-                              'Sign In',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: InkWell(
-                            onTap: () {
-                              Navigator.of(context).pushReplacement(
-                                MaterialPageRoute(builder: (_) => const SignUpScreen()),
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(26),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              child: const Text(
-                                'Create Account',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Color(0xFF64748B),
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 40),
 
                   // Error message banner
                   if (_errorMessage != null) ...[
@@ -274,208 +135,103 @@ class _SignInScreenState extends State<SignInScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 20),
                   ],
 
-                  // Google Sign In (Rounded Pill)
-                  OutlinedButton(
-                    onPressed: (_isLoading || _isGoogleLoading) ? null : _handleGoogleSignIn,
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
-                      padding: const EdgeInsets.symmetric(vertical: 15),
+                  // Google Sign In (Solid Black Stadium Button)
+                  ElevatedButton(
+                    onPressed: _isGoogleLoading ? null : _handleGoogleSignIn,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
                       shape: const StadiumBorder(),
                     ),
                     child: _isGoogleLoading
                         ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                           )
                         : Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Image.network(
-                                'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                                height: 18,
-                                width: 18,
-                                errorBuilder: (_, __, ___) => const Icon(Icons.login, size: 18),
+                              Container(
+                                width: 24,
+                                height: 24,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                padding: const EdgeInsets.all(4),
+                                child: Image.network(
+                                  'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                                  errorBuilder: (_, __, ___) => const Icon(Icons.login, size: 14, color: Colors.black),
+                                ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 12),
                               const Text(
                                 'Continue with Google',
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 15,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black,
+                                  letterSpacing: 0.2,
                                 ),
                               ),
                             ],
                           ),
                   ),
 
-                  const SizedBox(height: 20),
-                  // Divider
-                  Row(
-                    children: [
-                      const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'or with email',
-                          style: TextStyle(
-                            color: Color(0xFF94A3B8),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
+                  const SizedBox(height: 36),
+
+                  // Feature Cards / Highlights
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildFeatureRow(
+                          Icons.flash_on_rounded,
+                          'Instant Access',
+                          'One-tap Google sign-in with no passwords to remember',
                         ),
-                      ),
-                      const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Email Field (Rounded 20)
-                  TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w500),
-                    decoration: InputDecoration(
-                      labelText: 'Work Email',
-                      labelStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                      prefixIcon: const Icon(Icons.mail_outline, color: Color(0xFF94A3B8), size: 20),
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Colors.black, width: 1.5),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-
-                  // Password Field (Rounded 20)
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    style: const TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w500),
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      labelStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                      prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF94A3B8), size: 20),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                          color: const Color(0xFF94A3B8),
-                          size: 20,
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Divider(color: Color(0xFFE2E8F0), height: 1),
                         ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                      ),
-                      filled: true,
-                      fillColor: const Color(0xFFF8FAFC),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Colors.black, width: 1.5),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                        _buildFeatureRow(
+                          Icons.camera_alt_rounded,
+                          'Biometric Face Scanner',
+                          'Offline MobileFaceNet on-device kiosk verification',
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Divider(color: Color(0xFFE2E8F0), height: 1),
+                        ),
+                        _buildFeatureRow(
+                          Icons.business_rounded,
+                          'Multi-Office Ready',
+                          'Manage up to 3 office rooms with real-time logs',
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 22),
 
-                  // Primary Sign In Button (Stadium Pill, Black)
-                  ElevatedButton(
-                    onPressed: (_isLoading || _isGoogleLoading) ? null : _handlePasswordSignIn,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: const StadiumBorder(),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text(
-                            'Sign In',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // OTP Button (Stadium Pill, Outlined)
-                  OutlinedButton.icon(
-                    onPressed: (_isLoading || _isGoogleLoading) ? null : _handleOtpSignIn,
-                    icon: const Icon(Icons.mark_email_read_outlined, size: 18, color: Colors.black),
-                    label: const Text(
-                      'Sign In with Email Code (OTP)',
+                  const SizedBox(height: 28),
+                  const Center(
+                    child: Text(
+                      'FaceTrack (DTR) • Secure OAuth 2.0',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
+                        fontSize: 11,
+                        color: Color(0xFF94A3B8),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.black,
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: const StadiumBorder(),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // Footer Link
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        "Don't have an account? ",
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 13,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).pushReplacement(
-                            MaterialPageRoute(builder: (_) => const SignUpScreen()),
-                          );
-                        },
-                        child: const Text(
-                          'Create Account',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),
@@ -483,6 +239,49 @@ class _SignInScreenState extends State<SignInScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildFeatureRow(IconData icon, String title, String subtitle) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Icon(icon, size: 18, color: Colors.black),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF64748B),
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
