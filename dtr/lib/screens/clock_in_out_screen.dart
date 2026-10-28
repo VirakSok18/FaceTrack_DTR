@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:ui';
 import '../config/api_config.dart';
+import '../models/workplace.dart';
+import '../services/dtr_service.dart';
+import '../services/face_recognition_service.dart';
+import '../services/room_service.dart';
+import 'rooms/room_list_screen.dart';
 import 'register_face_screen.dart';
 
 class ClockInOutScreen extends StatefulWidget {
+  final Workplace? workplace;
+
+  const ClockInOutScreen({Key? key, this.workplace}) : super(key: key);
+
   @override
   _ClockInOutScreenState createState() => _ClockInOutScreenState();
 }
@@ -18,21 +26,44 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
   String message = 'Align your face within the frame';
   String subMessage = 'Ready for biometric verification';
 
+  Workplace? _currentRoom;
+  bool isCameraInitializing = false;
+
   @override
   void initState() {
     super.initState();
-    initCamera();
+    _initRoomAndCamera();
   }
 
-  bool isCameraInitializing = false;
+  Future<void> _initRoomAndCamera() async {
+    if (widget.workplace != null) {
+      _currentRoom = widget.workplace;
+    } else {
+      _currentRoom = await RoomService().getActiveRoom();
+    }
+
+    if (_currentRoom == null) {
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const RoomListScreen()),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {});
+      initCamera();
+    }
+  }
 
   Future<void> initCamera() async {
     if (isCameraInitializing) return;
     isCameraInitializing = true;
 
-    // Increased delay to ensure OS has fully released camera hardware from previous screen
-    await Future.delayed(const Duration(milliseconds: 800));
-    
+    // Small delay to ensure OS has fully released camera hardware from previous screen
+    await Future.delayed(const Duration(milliseconds: 600));
+
     if (_controller != null) {
       try {
         await _controller!.dispose();
@@ -59,8 +90,15 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
         return;
       }
 
-      int cameraIndex = cameras!.length > 1 ? 1 : 0;
-      
+      // Default to front camera if available
+      int cameraIndex = 0;
+      for (int i = 0; i < cameras!.length; i++) {
+        if (cameras![i].lensDirection == CameraLensDirection.front) {
+          cameraIndex = i;
+          break;
+        }
+      }
+
       _controller = CameraController(
         cameras![cameraIndex],
         ResolutionPreset.medium,
@@ -69,7 +107,7 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
       );
 
       await _controller!.initialize();
-      
+
       if (mounted) {
         setState(() {
           subMessage = 'Ready for biometric verification';
@@ -81,7 +119,6 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
         setState(() {
           subMessage = 'Biometric sensor failure - Retrying...';
         });
-        // Optional: retry once
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) initCamera();
       }
@@ -91,119 +128,213 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
   }
 
   Future<void> scanAndClock() async {
-    if (isProcessing) return;
-    
+    if (isProcessing || _controller == null || !_controller!.value.isInitialized) return;
+    if (_currentRoom == null) return;
+
     setState(() {
       isProcessing = true;
       message = 'Analyzing Biometrics';
-      subMessage = 'Connecting to verification server...';
+      subMessage = 'Running MobileFaceNet on-device neural model...';
     });
 
     try {
       final image = await _controller!.takePicture();
-      final bytes = await image.readAsBytes();
-      final base64Image = base64Encode(bytes);
 
-      final recognizeResponse = await http.post(
-        Uri.parse(ApiConfig.RECOGNIZE_FACE),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'photo': 'data:image/jpeg;base64,$base64Image',
-        }),
+      // 1. High-accuracy On-Device Face Recognition with MobileFaceNet & ML Kit
+      final matchResult = await FaceRecognitionService().recognizeFace(
+        workplaceId: _currentRoom!.id,
+        imagePath: image.path,
       );
 
-      if (recognizeResponse.statusCode != 200) {
-        final error = json.decode(recognizeResponse.body);
+      if (!matchResult.isIdentified || matchResult.employeeId == null) {
         setState(() {
-          message = 'Verification Failed';
-          subMessage = error['error'] ?? 'Identity not recognized';
+          message = 'Identity Unknown';
+          subMessage = matchResult.message;
           isProcessing = false;
         });
         return;
       }
 
-      final recognizeData = json.decode(recognizeResponse.body);
-      final employeeId = recognizeData['employeeId'];
-      final confidence = recognizeData['confidence'];
+      final recognizedEmployeeId = matchResult.employeeId!;
+      final confidence = matchResult.confidence;
 
       setState(() {
         message = 'Identity Verified';
-        subMessage = 'Retreiving shift records...';
+        subMessage = 'Verifying office assignment & records...';
       });
 
-      final employeeResponse = await http.get(
-        Uri.parse('${ApiConfig.EMPLOYEES}/$employeeId'),
+      // 2. Room-Scoped Verification & Clock In/Out via Supabase
+      final clockResult = await DtrService().clockInOrOut(
+        employeeId: recognizedEmployeeId,
+        workplaceId: _currentRoom!.id,
+        currentOfficeName: _currentRoom!.name,
       );
 
-      if (employeeResponse.statusCode != 200) {
+      if (!mounted) return;
+
+      if (!clockResult.success) {
         setState(() {
-          message = 'System Error';
-          subMessage = 'Employee records not found';
           isProcessing = false;
+          message = clockResult.isDeniedWrongOffice ? 'ACCESS DENIED' : 'Verification Issue';
+          subMessage = clockResult.message;
         });
+
+        if (clockResult.isDeniedWrongOffice) {
+          _showWrongOfficeDeniedSheet(clockResult);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(clockResult.message), backgroundColor: Colors.redAccent),
+          );
+        }
         return;
       }
 
-      final employee = json.decode(employeeResponse.body);
-      final employeeName = employee['name'];
-
-      final today = DateTime.now().toIso8601String().split('T')[0];
-      final dtrResponse = await http.get(
-        Uri.parse('${ApiConfig.NODE_API}/dtr/$employeeId'),
-      );
-
-      final dtrRecords = json.decode(dtrResponse.body);
-      bool isClockedIn = false;
-
-      for (var record in dtrRecords) {
-        if (record['date'] == today && record['clockOut'] == null) {
-          isClockedIn = true;
-          break;
-        }
-      }
-
-      String endpoint = isClockedIn ? ApiConfig.DTR_CLOCKOUT : ApiConfig.DTR_CLOCKIN;
-      String action = isClockedIn ? 'Clock Out' : 'Clock In';
-
-      final clockResponse = await http.post(
-        Uri.parse(endpoint),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'employeeId': employeeId}),
-      );
-
-      if (clockResponse.statusCode == 200) {
-        setState(() {
-          message = 'Success';
-          subMessage = '$action confirmed for $employeeName';
-          isProcessing = false;
-        });
-
-        _showSuccessSheet(employeeName, action, confidence);
-      } else {
-        final error = json.decode(clockResponse.body);
-        setState(() {
-          message = 'Clocking Failed';
-          subMessage = error['error'] ?? 'Could not record timestamp';
-          isProcessing = false;
-        });
-      }
-    } catch (e) {
+      // Success!
       setState(() {
-        message = 'Connection Lost';
-        subMessage = 'Please verify server status';
+        message = 'Success';
+        subMessage = '${clockResult.action} confirmed for ${clockResult.employeeName}';
         isProcessing = false;
       });
+
+      _showSuccessSheet(clockResult.employeeName, clockResult.action, confidence);
+    } catch (e) {
+      debugPrint('[ClockInOut] scanAndClock error: $e');
+      if (mounted) {
+        setState(() {
+          message = 'System Error';
+          subMessage = 'Biometric processing interrupted: $e';
+          isProcessing = false;
+        });
+      }
     }
   }
 
-  void _showSuccessSheet(String name, String action, double confidence) {
+  /// ACCESS DENIED: Employee scanned in the wrong room/office
+  void _showWrongOfficeDeniedSheet(ClockResult result) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF1E293B),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(36)),
+            ),
+            padding: const EdgeInsets.fromLTRB(28, 20, 28, 36),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 48,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF475569),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // Red Warning Icon
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(color: Colors.redAccent.withOpacity(0.4), width: 1.5),
+                  ),
+                  child: const Icon(Icons.block_rounded, color: Colors.redAccent, size: 44),
+                ),
+                const SizedBox(height: 20),
+
+                const Text(
+                  'ACCESS DENIED',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                    color: Colors.redAccent,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                Text(
+                  'WRONG OFFICE LOCATION',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.5,
+                    color: Colors.white.withOpacity(0.6),
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F172A),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.red.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        result.employeeName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'This employee is assigned to "${result.assignedOfficeName ?? 'Another Office'}". Attendance can only be clocked in at your designated office location.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF94A3B8),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF334155),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showSuccessSheet(String name, String action, double confidence) {
+    final now = DateTime.now();
+    final timeStr = "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
           child: Container(
             decoration: const BoxDecoration(
               color: Colors.white,
@@ -218,11 +349,11 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                     width: 50,
                     height: 5,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE2E8F0), // Slate 200
+                      color: const Color(0xFFE2E8F0),
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -231,28 +362,63 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                     ),
                     child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   Text(
                     action.toUpperCase(),
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 2,
-                      color: Color(0xFF64748B), // Slate 500
+                      color: Color(0xFF64748B),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     name,
                     style: const TextStyle(
-                      fontSize: 28,
+                      fontSize: 26,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFF0F172A),
-                      letterSpacing: -1,
+                      letterSpacing: -0.5,
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 12),
+                  // Room & Time info
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.location_on, size: 16, color: Color(0xFF3B82F6)),
+                        const SizedBox(width: 6),
+                        Text(
+                          _currentRoom?.name ?? 'Office',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Icon(Icons.access_time_rounded, size: 16, color: Color(0xFF64748B)),
+                        const SizedBox(width: 6),
+                        Text(
+                          timeStr,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -260,9 +426,9 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F172A),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        padding: const EdgeInsets.symmetric(vertical: 18),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                       child: const Text(
@@ -288,29 +454,71 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final roomName = _currentRoom?.name ?? 'Office';
+    final roomCode = _currentRoom?.code ?? '';
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('PORTAL ACCESS'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Color(0xFF0F172A)),
+          tooltip: 'Switch Office',
+          onPressed: () async {
+            if (_controller != null) {
+              await _controller!.dispose();
+              _controller = null;
+            }
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const RoomListScreen()),
+              );
+            }
+          },
+        ),
+        title: Column(
+          children: [
+            Text(
+              roomName.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.5,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+            if (roomCode.isNotEmpty)
+              Text(
+                'KIOSK • $roomCode',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                  color: Color(0xFF3B82F6),
+                ),
+              ),
+          ],
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: IconButton(
               icon: const Icon(Icons.person_add_rounded, color: Color(0xFF0F172A)),
+              tooltip: 'Register New Employee Face',
               onPressed: () async {
-                // Dispose camera before navigating to free up hardware
                 if (_controller != null) {
                   await _controller!.dispose();
                   _controller = null;
                 }
-                
+
                 if (mounted) {
                   await Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => RegisterFaceScreen()),
+                    MaterialPageRoute(
+                      builder: (context) => RegisterFaceScreen(workplace: _currentRoom),
+                    ),
                   );
-                  
-                  // Re-initialize camera when returning
+
+                  // Re-initialize camera on return
                   initCamera();
                 }
               },
@@ -325,9 +533,9 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
             children: [
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(24.0),
+                  padding: const EdgeInsets.all(20.0),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(40),
+                    borderRadius: BorderRadius.circular(36),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
@@ -341,8 +549,11 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                             ),
                           )
                         else
-                          Container(color: Colors.black12, child: const Center(child: CircularProgressIndicator())),
-                        
+                          Container(
+                            color: Colors.black12,
+                            child: const Center(child: CircularProgressIndicator(color: Color(0xFF0F172A))),
+                          ),
+
                         // Glassmorphic Overlay
                         BackdropFilter(
                           filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
@@ -355,33 +566,37 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                                   Colors.black.withOpacity(0.05),
                                   Colors.transparent,
                                   Colors.transparent,
-                                  Colors.black.withOpacity(0.3),
+                                  Colors.black.withOpacity(0.35),
                                 ],
                                 stops: const [0, 0.3, 0.7, 1],
                               ),
                             ),
                           ),
                         ),
-    
+
                         // Frame corners
-                        CustomPaint(painter: FramePainter(color: isProcessing ? Colors.white.withOpacity(0.3) : Colors.white)),
+                        CustomPaint(
+                          painter: FramePainter(
+                            color: isProcessing ? Colors.white.withOpacity(0.3) : Colors.white,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
               ),
-              
+
               Container(
-                padding: const EdgeInsets.fromLTRB(32, 4, 32, 40),
+                padding: const EdgeInsets.fromLTRB(32, 4, 32, 36),
                 child: Column(
-                   children: [
+                  children: [
                     Text(
                       message.toUpperCase(),
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 2.0,
-                        color: Color(0xFF64748B), // Slate 500
+                        color: Color(0xFF64748B),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -394,9 +609,8 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    
-                    const SizedBox(height: 32),
-                    
+                    const SizedBox(height: 28),
+
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -404,30 +618,30 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF0F172A),
                           foregroundColor: Colors.white,
-                          disabledBackgroundColor: const Color(0xFFE2E8F0), // Slate 200
+                          disabledBackgroundColor: const Color(0xFFE2E8F0),
                           padding: const EdgeInsets.symmetric(vertical: 20),
                           elevation: 4,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
                         ),
-                        child: isProcessing 
-                          ? const SizedBox(
-                              height: 20, 
-                              width: 20, 
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)
-                            )
-                          : Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: const [
-                                Icon(Icons.face_unlock_rounded, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'VERIFY IDENTITY',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1.2),
-                                ),
-                              ],
-                            ),
+                        child: isProcessing
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: const [
+                                  Icon(Icons.face_unlock_rounded, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'VERIFY IDENTITY',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 1.2),
+                                  ),
+                                ],
+                              ),
                       ),
                     ),
                   ],
@@ -453,41 +667,48 @@ class FramePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     const cornerLength = 40.0;
-    
-    // Better frame sizing for responsiveness
+
     final paddingH = size.width * 0.15;
     final paddingV = size.height * 0.15;
-    
+
     final rect = Rect.fromLTWH(paddingH, paddingV, size.width - paddingH * 2, size.height - paddingV * 2);
     final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(30));
 
     // Top Left
-    canvas.drawPath(Path()
-      ..moveTo(rrect.left, rrect.top + cornerLength)
-      ..lineTo(rrect.left, rrect.top + 30)
-      ..arcToPoint(Offset(rrect.left + 30, rrect.top), radius: const Radius.circular(30))
-      ..lineTo(rrect.left + cornerLength, rrect.top), paint);
+    canvas.drawPath(
+        Path()
+          ..moveTo(rrect.left, rrect.top + cornerLength)
+          ..lineTo(rrect.left, rrect.top + 30)
+          ..arcToPoint(Offset(rrect.left + 30, rrect.top), radius: const Radius.circular(30))
+          ..lineTo(rrect.left + cornerLength, rrect.top),
+        paint);
 
     // Top Right
-    canvas.drawPath(Path()
-      ..moveTo(rrect.right - cornerLength, rrect.top)
-      ..lineTo(rrect.right - 30, rrect.top)
-      ..arcToPoint(Offset(rrect.right, rrect.top + 30), radius: const Radius.circular(30))
-      ..lineTo(rrect.right, rrect.top + cornerLength), paint);
+    canvas.drawPath(
+        Path()
+          ..moveTo(rrect.right - cornerLength, rrect.top)
+          ..lineTo(rrect.right - 30, rrect.top)
+          ..arcToPoint(Offset(rrect.right, rrect.top + 30), radius: const Radius.circular(30))
+          ..lineTo(rrect.right, rrect.top + cornerLength),
+        paint);
 
     // Bottom Left
-    canvas.drawPath(Path()
-      ..moveTo(rrect.left, rrect.bottom - cornerLength)
-      ..lineTo(rrect.left, rrect.bottom - 30)
-      ..arcToPoint(Offset(rrect.left + 30, rrect.bottom), radius: const Radius.circular(30), clockwise: false)
-      ..lineTo(rrect.left + cornerLength, rrect.bottom), paint);
+    canvas.drawPath(
+        Path()
+          ..moveTo(rrect.left, rrect.bottom - cornerLength)
+          ..lineTo(rrect.left, rrect.bottom - 30)
+          ..arcToPoint(Offset(rrect.left + 30, rrect.bottom), radius: const Radius.circular(30), clockwise: false)
+          ..lineTo(rrect.left + cornerLength, rrect.bottom),
+        paint);
 
     // Bottom Right
-    canvas.drawPath(Path()
-      ..moveTo(rrect.right - cornerLength, rrect.bottom)
-      ..lineTo(rrect.right - 30, rrect.bottom)
-      ..arcToPoint(Offset(rrect.right, rrect.bottom - 30), radius: const Radius.circular(30), clockwise: false)
-      ..lineTo(rrect.right, rrect.bottom - cornerLength), paint);
+    canvas.drawPath(
+        Path()
+          ..moveTo(rrect.right - cornerLength, rrect.bottom)
+          ..lineTo(rrect.right - 30, rrect.bottom)
+          ..arcToPoint(Offset(rrect.right, rrect.bottom - 30), radius: const Radius.circular(30), clockwise: false)
+          ..lineTo(rrect.right, rrect.bottom - cornerLength),
+        paint);
   }
 
   @override
