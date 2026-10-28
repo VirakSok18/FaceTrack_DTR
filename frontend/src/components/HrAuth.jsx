@@ -1,27 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loader2, ArrowRight, ShieldCheck, Sparkles, Building2, AlertCircle, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
-
-const GOOGLE_CLIENT_ID = '252930255591-6omvnugnkt9v3qbnlen1rfp49cs2jdeh.apps.googleusercontent.com';
-
-function decodeJwt(token) {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      window
-        .atob(base64)
-        .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    return JSON.parse(jsonPayload);
-  } catch (e) {
-    return null;
-  }
-}
 
 export default function HrAuth({ onAuthenticated }) {
   const navigate = useNavigate();
@@ -29,112 +10,12 @@ export default function HrAuth({ onAuthenticated }) {
   const [error, setError] = useState(null);
   const [showProviderGuide, setShowProviderGuide] = useState(false);
 
-  // Initialize Google Identity Services (GIS) on mount
-  useEffect(() => {
-    const initGoogleGsi = () => {
-      if (window.google?.accounts?.id) {
-        try {
-          window.google.accounts.id.initialize({
-            client_id: GOOGLE_CLIENT_ID,
-            callback: async (response) => {
-              if (!response?.credential) return;
-              setLoading(true);
-              setError(null);
-              try {
-                const payload = decodeJwt(response.credential);
-                const userEmail = payload?.email?.toLowerCase();
-                if (!userEmail) throw new Error('Could not extract email from Google identity.');
-
-                // Attempt Supabase session sync with ID Token
-                try {
-                  await supabase.auth.signInWithIdToken({
-                    provider: 'google',
-                    token: response.credential,
-                  });
-                } catch (sbErr) {
-                  console.warn('[Google Auth] Supabase ID token sync notice:', sbErr);
-                }
-
-                onAuthenticated({
-                  email: userEmail,
-                  user: {
-                    email: userEmail,
-                    user_metadata: {
-                      full_name: payload.name || 'Google User',
-                      avatar_url: payload.picture,
-                    },
-                  },
-                });
-              } catch (err) {
-                setError(err.message || 'Google authentication failed.');
-              } finally {
-                setLoading(false);
-              }
-            },
-            auto_select: false,
-            cancel_on_tap_outside: true,
-          });
-
-          // Render Google button into container if present
-          const btnContainer = document.getElementById('google-btn-container');
-          if (btnContainer) {
-            window.google.accounts.id.renderButton(btnContainer, {
-              theme: 'outline',
-              size: 'large',
-              width: 340,
-              shape: 'pill',
-              text: 'continue_with',
-            });
-          }
-        } catch (e) {
-          console.warn('[Google Auth] GSI init warning:', e);
-        }
-      }
-    };
-
-    if (window.google?.accounts?.id) {
-      initGoogleGsi();
-    } else {
-      const timer = setInterval(() => {
-        if (window.google?.accounts?.id) {
-          clearInterval(timer);
-          initGoogleGsi();
-        }
-      }, 300);
-      return () => clearInterval(timer);
-    }
-  }, [onAuthenticated]);
-
-  // Primary Google Sign-In Trigger
+  // Primary Google Sign-In Trigger via Supabase OAuth
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
     setShowProviderGuide(false);
 
-    // 1. Try Google Identity Services Popup first
-    if (window.google?.accounts?.id) {
-      try {
-        window.google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            console.log('[Google Auth] Prompt not displayed, trying OAuth redirect fallback');
-            triggerSupabaseOAuth();
-          }
-        });
-        // Set timeout to avoid hanging if prompt is dismissed silently
-        setTimeout(() => {
-          setLoading(false);
-        }, 2500);
-        return;
-      } catch (e) {
-        console.warn('[Google Auth] Prompt failed:', e);
-      }
-    }
-
-    // 2. Fallback to Supabase OAuth redirect
-    await triggerSupabaseOAuth();
-  };
-
-  const triggerSupabaseOAuth = async () => {
     try {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -205,9 +86,8 @@ export default function HrAuth({ onAuthenticated }) {
           </div>
         )}
 
-        {/* OAuth Authentication Area */}
+        {/* OAuth Authentication Button */}
         <div className="space-y-4">
-          {/* Custom Google OAuth Button */}
           <button
             type="button"
             onClick={handleGoogleSignIn}
@@ -243,9 +123,6 @@ export default function HrAuth({ onAuthenticated }) {
               </>
             )}
           </button>
-
-          {/* Hidden/Fallback Google GSI native container */}
-          <div id="google-btn-container" className="flex justify-center empty:hidden" />
         </div>
 
         {/* Feature Badges */}
