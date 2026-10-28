@@ -4,7 +4,7 @@ import { Loader2, ArrowRight, ShieldCheck, Sparkles, Building2, AlertCircle, Ext
 import { useNavigate } from 'react-router-dom';
 import BrandLogo from './BrandLogo';
 
-const GOOGLE_CLIENT_ID = '583980575924-q4ellmg3de7hibrhpo04alpr4rf2nm2b.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '252930255591-6omvnugnkt9v3qbnlen1rfp49cs2jdeh.apps.googleusercontent.com';
 
 function decodeJwt(token) {
   try {

@@ -6,7 +6,7 @@ class ApiConfig {
 
   // Google OAuth Client ID
   static const String googleWebClientId =
-      '583980575924-q4ellmg3de7hibrhpo04alpr4rf2nm2b.apps.googleusercontent.com';
+      '252930255591-6omvnugnkt9v3qbnlen1rfp49cs2jdeh.apps.googleusercontent.com';
 
   // Email Relay for OTP verification (FaceTrack DTR native serverless function)
   static const String emailRelayUrl = 'https://facetrackdtr.vercel.app/api/send-email';
