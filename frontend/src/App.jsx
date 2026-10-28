@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Users, UserPlus, Building2, Plus, Copy, Check, X, ShieldCheck } from 'lucide-react';
 import Navbar from './components/Navbar';
 import LandingPage from './components/LandingPage';
@@ -37,8 +37,10 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // 1. Initial Session / URL Parameters Check
+  // 1. Initial Session / URL Parameters Check & Supabase OAuth Listener
   useEffect(() => {
+    let authSubscription = null;
+
     async function checkAuthAndUrl() {
       setIsLoading(true);
 
@@ -55,28 +57,75 @@ function App() {
           setAuth({ isTokenGuest: true, roomCode: verifiedRoom.code });
           setIsLoading(false);
           // If accessing via direct room link, route to dashboard
-          if (window.location.pathname === '/') {
+          if (window.location.pathname === '/' || window.location.pathname === '/login') {
             navigate('/dashboard');
           }
           return;
         }
       }
 
-      // B. Check persistent localStorage login
-      const savedEmail = localStorage.getItem('hr_user_email');
-      if (savedEmail) {
-        setAuth({ email: savedEmail });
-        const userRooms = await fetchUserWorkplaces(savedEmail);
-        setOffices(userRooms);
-        if (userRooms.length > 0) {
-          setSelectedOffice(userRooms[0]);
+      // B. Check active Supabase session (Google OAuth redirect or stored session)
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const activeEmail = session?.user?.email || localStorage.getItem('hr_user_email');
+
+        if (activeEmail) {
+          localStorage.setItem('hr_user_email', activeEmail);
+          setAuth({ email: activeEmail, user: session?.user || null });
+          const userRooms = await fetchUserWorkplaces(activeEmail);
+          setOffices(userRooms);
+          if (userRooms.length > 0) {
+            setSelectedOffice(userRooms[0]);
+          }
+          if (window.location.hash.includes('access_token')) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+          if (window.location.pathname === '/login' || window.location.pathname === '/auth') {
+            navigate('/dashboard');
+          }
         }
+      } catch (err) {
+        console.error('Session retrieval error:', err);
       }
 
       setIsLoading(false);
+
+      // C. Listen for Supabase auth state changes (e.g. Google OAuth sign-in)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+        if (newSession?.user?.email) {
+          const userEmail = newSession.user.email;
+          localStorage.setItem('hr_user_email', userEmail);
+          setAuth({ email: userEmail, user: newSession.user });
+          const userRooms = await fetchUserWorkplaces(userEmail);
+          setOffices(userRooms);
+          if (userRooms.length > 0) {
+            setSelectedOffice(userRooms[0]);
+          }
+          if (window.location.hash.includes('access_token')) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+          if (window.location.pathname === '/login' || window.location.pathname === '/auth') {
+            navigate('/dashboard');
+          }
+        } else if (event === 'SIGNED_OUT') {
+          localStorage.removeItem('hr_user_email');
+          setAuth(null);
+          setSelectedOffice(null);
+          setOffices([]);
+          setEmployees([]);
+          setStatuses({});
+        }
+      });
+      authSubscription = subscription;
     }
 
     checkAuthAndUrl();
+
+    return () => {
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
+    };
   }, []);
 
   // 2. Load Employees and Real-time Statuses whenever selectedOffice changes
@@ -237,8 +286,9 @@ function App() {
     navigate('/dashboard');
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
     localStorage.removeItem('hr_user_email');
+    await supabase.auth.signOut().catch(() => {});
     setAuth(null);
     setSelectedOffice(null);
     setOffices([]);
@@ -289,6 +339,7 @@ function App() {
             </div>
           }
         />
+        <Route path="/auth" element={<Navigate to="/login" replace />} />
 
         {/* HR Dashboard */}
         <Route

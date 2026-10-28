@@ -217,9 +217,10 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
           child: Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF1E293B),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(36)),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(36)),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
             padding: const EdgeInsets.fromLTRB(28, 20, 28, 36),
             child: Column(
@@ -229,7 +230,7 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                   width: 48,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF475569),
+                    color: const Color(0xFFCBD5E1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
@@ -239,9 +240,9 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                 Container(
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.18),
+                    color: Colors.red.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(26),
-                    border: Border.all(color: Colors.redAccent.withOpacity(0.4), width: 1.5),
+                    border: Border.all(color: Colors.redAccent.withOpacity(0.3), width: 1.5),
                   ),
                   child: const Icon(Icons.block_rounded, color: Colors.redAccent, size: 44),
                 ),
@@ -258,13 +259,13 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                Text(
+                const Text(
                   'WRONG OFFICE LOCATION',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     letterSpacing: 1.5,
-                    color: Colors.white.withOpacity(0.6),
+                    color: Color(0xFF64748B),
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -272,9 +273,9 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0F172A),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.red.withOpacity(0.2)),
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
                   ),
                   child: Column(
                     children: [
@@ -283,7 +284,7 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: Colors.black,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -292,7 +293,7 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 13,
-                          color: Color(0xFF94A3B8),
+                          color: Color(0xFF64748B),
                           height: 1.4,
                         ),
                       ),
@@ -306,10 +307,11 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                   child: ElevatedButton(
                     onPressed: () => Navigator.pop(context),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF334155),
+                      backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: const StadiumBorder(),
+                      elevation: 0,
                     ),
                     child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
@@ -355,7 +357,7 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
+                      color: Colors.black,
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
@@ -376,7 +378,7 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                     style: const TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F172A),
+                      color: Colors.black,
                       letterSpacing: -0.5,
                     ),
                     textAlign: TextAlign.center,
@@ -455,10 +457,12 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
     final roomCode = _currentRoom?.code ?? '';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Color(0xFF0F172A)),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: Colors.black),
           tooltip: 'Switch Office',
           onPressed: () async {
             if (_controller != null) {
@@ -480,7 +484,7 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                 fontSize: 15,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 0.5,
-                color: Color(0xFF0F172A),
+                color: Colors.black,
               ),
             ),
             if (roomCode.isNotEmpty)
@@ -499,7 +503,7 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
           Padding(
             padding: const EdgeInsets.only(right: 8.0),
             child: IconButton(
-              icon: const Icon(Icons.person_add_rounded, color: Color(0xFF0F172A)),
+              icon: const Icon(Icons.person_add_rounded, color: Colors.black),
               tooltip: 'Register New Employee Face',
               onPressed: () async {
                 if (_controller != null) {
@@ -548,7 +552,7 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                         else
                           Container(
                             color: Colors.black12,
-                            child: const Center(child: CircularProgressIndicator(color: Color(0xFF0F172A))),
+                            child: const Center(child: CircularProgressIndicator(color: Colors.black)),
                           ),
 
                         // Glassmorphic Overlay
@@ -602,7 +606,7 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F172A),
+                        color: Colors.black,
                       ),
                       textAlign: TextAlign.center,
                     ),

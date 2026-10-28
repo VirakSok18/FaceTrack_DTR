@@ -110,7 +110,7 @@ class _OtpScreenState extends State<OtpScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('A fresh verification code was sent to ${widget.email}'),
-            backgroundColor: const Color(0xFF0F172A),
+            backgroundColor: Colors.black,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
@@ -133,7 +133,7 @@ class _OtpScreenState extends State<OtpScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF0F172A)),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -152,7 +152,7 @@ class _OtpScreenState extends State<OtpScreen> {
                       width: 68,
                       height: 68,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A),
+                        color: Colors.black,
                         borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
@@ -180,7 +180,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F172A),
+                      color: Colors.black,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -199,7 +199,7 @@ class _OtpScreenState extends State<OtpScreen> {
                         TextSpan(
                           text: widget.email,
                           style: const TextStyle(
-                            color: Color(0xFF0F172A),
+                            color: Colors.black,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -244,7 +244,7 @@ class _OtpScreenState extends State<OtpScreen> {
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: _focusNode.hasFocus
-                            ? const Color(0xFF0F172A)
+                            ? Colors.black
                             : const Color(0xFFE2E8F0),
                         width: 1.5,
                       ),
@@ -260,7 +260,7 @@ class _OtpScreenState extends State<OtpScreen> {
                         fontSize: 28,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 14,
-                        color: Color(0xFF0F172A),
+                        color: Colors.black,
                       ),
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
@@ -288,7 +288,7 @@ class _OtpScreenState extends State<OtpScreen> {
                   ElevatedButton(
                     onPressed: _isVerifying ? null : _handleVerify,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F172A),
+                      backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: const Color(0xFF94A3B8),
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -329,7 +329,7 @@ class _OtpScreenState extends State<OtpScreen> {
                         Text(
                           'Resend in ${_resendCooldown}s',
                           style: const TextStyle(
-                            color: Color(0xFF0F172A),
+                            color: Colors.black,
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
@@ -351,7 +351,7 @@ class _OtpScreenState extends State<OtpScreen> {
                               : const Text(
                                   'Resend Code',
                                   style: TextStyle(
-                                    color: Color(0xFF0F172A),
+                                    color: Colors.black,
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
                                   ),

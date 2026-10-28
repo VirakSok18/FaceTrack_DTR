@@ -61,34 +61,35 @@ class MyApp extends StatelessWidget {
       title: 'FaceTrack DTR',
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0F172A), // Slate 900
-          primary: const Color(0xFF0F172A),
+        scaffoldBackgroundColor: Colors.white,
+        colorScheme: const ColorScheme.light(
+          primary: Colors.black,
           onPrimary: Colors.white,
-          secondary: const Color(0xFF3B82F6), // Blue 500
+          secondary: Colors.black,
+          onSecondary: Colors.white,
           surface: Colors.white,
+          onSurface: Colors.black,
         ),
         fontFamily: 'Inter',
         appBarTheme: const AppBarTheme(
           elevation: 0,
           backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF0F172A),
+          foregroundColor: Colors.black,
           centerTitle: true,
           titleTextStyle: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w900,
-            color: Color(0xFF0F172A),
+            color: Colors.black,
             letterSpacing: -0.5,
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            elevation: 4,
-            shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.2),
+            elevation: 0,
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
+            shape: const StadiumBorder(),
           ),
         ),
       ),

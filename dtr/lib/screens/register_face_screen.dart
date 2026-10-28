@@ -186,7 +186,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
+                      color: Colors.black,
                       borderRadius: BorderRadius.circular(30),
                     ),
                     child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
@@ -207,7 +207,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F172A),
+                      color: Colors.black,
                       letterSpacing: -0.5,
                     ),
                     textAlign: TextAlign.center,
@@ -227,12 +227,11 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F172A),
+                        backgroundColor: Colors.black,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 18),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
+                        shape: const StadiumBorder(),
+                        elevation: 0,
                       ),
                       child: const Text(
                         'RETURN TO SCANNER',
@@ -261,23 +260,26 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: Colors.black,
+        elevation: 0,
         title: Column(
           children: [
             const Text(
               'FACE ENROLLMENT',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black),
             ),
             if (_currentRoom != null)
               Text(
                 'OFFICE: ${_currentRoom!.name.toUpperCase()}',
-                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF3B82F6)),
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
               ),
           ],
         ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: Colors.black),
           onPressed: () async {
             if (_controller != null) {
               await _controller!.dispose();
@@ -315,7 +317,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                           else
                             Container(
                               color: Colors.black12,
-                              child: const Center(child: CircularProgressIndicator(color: Color(0xFF0F172A))),
+                              child: const Center(child: CircularProgressIndicator(color: Colors.black)),
                             ),
                           Container(
                             decoration: BoxDecoration(
@@ -337,19 +339,13 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                       // Employee ID
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 15,
-                              offset: const Offset(0, 4),
-                            )
-                          ],
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: TextField(
                           controller: employeeIdController,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black),
                           decoration: const InputDecoration(
                             labelText: 'EMPLOYEE ID',
                             labelStyle: TextStyle(
@@ -362,7 +358,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                             hintStyle: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.all(16),
-                            prefixIcon: Icon(Icons.badge_rounded, color: Color(0xFF0F172A), size: 20),
+                            prefixIcon: Icon(Icons.badge_rounded, color: Colors.black, size: 20),
                           ),
                         ),
                       ),
@@ -371,19 +367,13 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                       // Full Name
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 15,
-                              offset: const Offset(0, 4),
-                            )
-                          ],
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: TextField(
                           controller: nameController,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black),
                           decoration: const InputDecoration(
                             labelText: 'FULL NAME',
                             labelStyle: TextStyle(
@@ -396,7 +386,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                             hintStyle: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.all(16),
-                            prefixIcon: Icon(Icons.person_outline_rounded, color: Color(0xFF0F172A), size: 20),
+                            prefixIcon: Icon(Icons.person_outline_rounded, color: Colors.black, size: 20),
                           ),
                         ),
                       ),
@@ -405,19 +395,13 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                       // Role
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.03),
-                              blurRadius: 15,
-                              offset: const Offset(0, 4),
-                            )
-                          ],
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
                         ),
                         child: TextField(
                           controller: roleController,
-                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.black),
                           decoration: const InputDecoration(
                             labelText: 'POSITION / ROLE',
                             labelStyle: TextStyle(
@@ -430,7 +414,7 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                             hintStyle: TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
                             border: InputBorder.none,
                             contentPadding: EdgeInsets.all(16),
-                            prefixIcon: Icon(Icons.work_outline_rounded, color: Color(0xFF0F172A), size: 20),
+                            prefixIcon: Icon(Icons.work_outline_rounded, color: Colors.black, size: 20),
                           ),
                         ),
                       ),
@@ -442,13 +426,11 @@ class _RegisterFaceScreenState extends State<RegisterFaceScreen> {
                         child: ElevatedButton(
                           onPressed: isLoading ? null : registerFace,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0F172A),
+                            backgroundColor: Colors.black,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 18),
-                            elevation: 4,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
+                            elevation: 0,
+                            shape: const StadiumBorder(),
                           ),
                           child: isLoading
                               ? const SizedBox(

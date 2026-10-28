@@ -152,7 +152,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       width: 68,
                       height: 68,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A), // Slate 950
+                        color: Colors.black,
                         borderRadius: BorderRadius.circular(22),
                         boxShadow: [
                           BoxShadow(
@@ -174,7 +174,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F172A),
+                      color: Colors.black,
                       letterSpacing: -0.6,
                     ),
                   ),
@@ -204,7 +204,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF0F172A),
+                              color: Colors.black,
                               borderRadius: BorderRadius.circular(26),
                               boxShadow: [
                                 BoxShadow(
@@ -282,7 +282,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     onPressed: (_isLoading || _isGoogleLoading) ? null : _handleGoogleSignIn,
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF0F172A),
+                      foregroundColor: Colors.black,
                       side: const BorderSide(color: Color(0xFFE2E8F0)),
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       shape: const StadiumBorder(),
@@ -291,7 +291,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F172A)),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
                           )
                         : Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -308,7 +308,7 @@ class _SignInScreenState extends State<SignInScreen> {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0F172A),
+                                  color: Colors.black,
                                 ),
                               ),
                             ],
@@ -340,7 +340,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w500),
+                    style: const TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w500),
                     decoration: InputDecoration(
                       labelText: 'Work Email',
                       labelStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
@@ -357,7 +357,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5),
+                        borderSide: const BorderSide(color: Colors.black, width: 1.5),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     ),
@@ -368,7 +368,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   TextField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
-                    style: const TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.w500),
+                    style: const TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w500),
                     decoration: InputDecoration(
                       labelText: 'Password',
                       labelStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
@@ -393,7 +393,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5),
+                        borderSide: const BorderSide(color: Colors.black, width: 1.5),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                     ),
@@ -404,7 +404,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   ElevatedButton(
                     onPressed: (_isLoading || _isGoogleLoading) ? null : _handlePasswordSignIn,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F172A),
+                      backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -430,17 +430,17 @@ class _SignInScreenState extends State<SignInScreen> {
                   // OTP Button (Stadium Pill, Outlined)
                   OutlinedButton.icon(
                     onPressed: (_isLoading || _isGoogleLoading) ? null : _handleOtpSignIn,
-                    icon: const Icon(Icons.mark_email_read_outlined, size: 18, color: Color(0xFF0F172A)),
+                    icon: const Icon(Icons.mark_email_read_outlined, size: 18, color: Colors.black),
                     label: const Text(
                       'Sign In with Email Code (OTP)',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
+                        color: Colors.black,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF0F172A),
+                      foregroundColor: Colors.black,
                       side: const BorderSide(color: Color(0xFFE2E8F0)),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: const StadiumBorder(),
@@ -469,7 +469,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         child: const Text(
                           'Create Account',
                           style: TextStyle(
-                            color: Color(0xFF0F172A),
+                            color: Colors.black,
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
                           ),
