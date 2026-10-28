@@ -12,7 +12,7 @@ class ApiConfig {
   static const String emailRelayUrl = 'https://melo-pi-one.vercel.app/api/send-email';
 
   // HR Web Dashboard Portal URL
-  static const String hrWebPortalUrl = 'https://dtr-portal.vercel.app';
+  static const String hrWebPortalUrl = 'https://facetrackdtr.vercel.app';
 
   // Local AI Biometric Servers (optional / hybrid mode)
   static const String host = '10.0.2.2'; // default for Android emulator
