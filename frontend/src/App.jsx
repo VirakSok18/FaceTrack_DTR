@@ -24,6 +24,7 @@ function App() {
   const [offices, setOffices] = useState([]);
   const [selectedOffice, setSelectedOffice] = useState(null);
   const [employees, setEmployees] = useState([]);
+  const [attendanceLogs, setAttendanceLogs] = useState([]);
   const [statuses, setStatuses] = useState({});
   const [isLoading, setIsLoading] = useState(true);
 
@@ -187,11 +188,21 @@ function App() {
 
       // 2. Fetch today's attendance logs
       const logs = await fetchAttendanceLogsByRoom(workplaceId);
-      calculateStatuses(emps, logs);
+      setAttendanceLogs(logs || []);
+      calculateStatuses(emps, logs || []);
     } catch (err) {
       console.error('Error loading office data:', err);
     }
   };
+
+  // Recalculate statuses periodically so shifts reaching end time transition to 'Absent' automatically
+  useEffect(() => {
+    if (employees.length === 0) return;
+    const interval = setInterval(() => {
+      calculateStatuses(employees, attendanceLogs);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [employees, attendanceLogs]);
 
   const calculateStatuses = (employeeList, logs) => {
     const now = new Date();
@@ -200,28 +211,51 @@ function App() {
     const newStatuses = {};
 
     for (const emp of employeeList) {
-      const empLog = logs.find(
-        (log) => (log.employee_id === emp.employeeId || log.employee_id === emp.id) && !log.clock_out
+      // Find today's attendance log for this staff member
+      const empLog = (logs || []).find(
+        (log) =>
+          log.employee_id === emp.employeeId ||
+          log.employee_id === emp.id ||
+          log.employee_id === emp._id
       );
 
-      if (empLog) {
-        newStatuses[emp._id] = empLog.status === 'Late' ? 'Late' : 'Clocked In';
-      } else {
-        const isWorkDay = Array.isArray(emp.workDays) && emp.workDays.includes(currentDayName);
-        if (isWorkDay) {
-          const [shiftH, shiftM] = (emp.shiftStart || '09:00').split(':').map(Number);
-          const shiftStartTime = new Date();
-          shiftStartTime.setHours(shiftH, shiftM, 0, 0);
+      let status = 'Not Scanned Yet';
 
-          if (now > new Date(shiftStartTime.getTime() + 30 * 60000)) {
-            newStatuses[emp._id] = 'Absent';
-          } else {
-            newStatuses[emp._id] = 'Expected';
-          }
+      if (empLog) {
+        // Scanned in today: either Late or Present
+        if (empLog.status === 'Late' || (empLog.late_minutes && Number(empLog.late_minutes) > 0)) {
+          status = 'Late';
         } else {
-          newStatuses[emp._id] = 'Off Duty';
+          status = 'Present';
+        }
+      } else {
+        // No scan recorded today
+        const workDays = Array.isArray(emp.workDays) && emp.workDays.length > 0
+          ? emp.workDays
+          : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+        const isWorkDay = workDays.includes(currentDayName);
+
+        if (!isWorkDay) {
+          status = 'Off Duty';
+        } else {
+          // Check if employee's shift has ended
+          const [endH, endM] = (emp.shiftEnd || '18:00').split(':').map(Number);
+          const shiftEndTime = new Date();
+          shiftEndTime.setHours(isNaN(endH) ? 18 : endH, isNaN(endM) ? 0 : endM, 0, 0);
+
+          if (now >= shiftEndTime) {
+            status = 'Absent';
+          } else {
+            status = 'Not Scanned Yet';
+          }
         }
       }
+
+      // Assign status to all possible identifier keys for rock-solid lookup
+      if (emp._id) newStatuses[emp._id] = status;
+      if (emp.id) newStatuses[emp.id] = status;
+      if (emp.employeeId) newStatuses[emp.employeeId] = status;
     }
 
     setStatuses(newStatuses);

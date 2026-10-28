@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { getFileUrl } from '../lib/api';
 import { Trash2, Eye, User, Phone, Search, Loader2 } from 'lucide-react';
+import StaffAvatar from './StaffAvatar';
 
 function EmployeeList({ employees, statuses, onSelectEmployee, onDeleteEmployee }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,6 +20,10 @@ function EmployeeList({ employees, statuses, onSelectEmployee, onDeleteEmployee 
     (emp.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
     (emp.employeeId && emp.employeeId.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const getStatus = (emp) => {
+    return statuses[emp._id] || statuses[emp.id] || statuses[emp.employeeId] || 'Not Scanned Yet';
+  };
 
   if (!employees || employees.length === 0) {
     return (
@@ -60,7 +64,7 @@ function EmployeeList({ employees, statuses, onSelectEmployee, onDeleteEmployee 
             <tr className="text-neutral-400 text-[11px] font-bold uppercase tracking-wider border-b border-neutral-100">
               <th className="px-6 py-3.5 text-left font-bold">Staff Member</th>
               <th className="px-6 py-3.5 text-left font-bold">Role & ID</th>
-              <th className="px-6 py-3.5 text-left font-bold">Status</th>
+              <th className="px-6 py-3.5 text-left font-bold">Today's Shift Status</th>
               <th className="px-6 py-3.5 text-right font-bold">Actions</th>
             </tr>
           </thead>
@@ -71,79 +75,111 @@ function EmployeeList({ employees, statuses, onSelectEmployee, onDeleteEmployee 
                   No matching staff members found.
                 </td>
               </tr>
-            ) : filteredEmployees.map(emp => (
-              <tr
-                key={emp._id || emp.id}
-                className="group hover:bg-neutral-50/80 transition-all duration-200 cursor-pointer"
-                onClick={() => onSelectEmployee(emp)}
-              >
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3.5">
-                    <div className="relative shrink-0">
-                      <img
-                        src={getFileUrl(emp.photo) || 'https://via.placeholder.com/150'}
-                        alt={emp.name}
-                        className="w-11 h-11 rounded-2xl object-cover border border-neutral-200 shadow-sm transition-transform group-hover:scale-105"
-                      />
-                      <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 border-2 border-white rounded-full ${
-                        statuses[emp._id] === 'Clocked In' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-neutral-300'
-                      }`} />
-                    </div>
-                    <div>
-                      <div className="font-bold text-black text-sm group-hover:text-neutral-700 transition-colors">{emp.name}</div>
-                      <div className="text-xs text-neutral-500 flex items-center gap-1 font-medium mt-0.5">
-                        <Phone className="w-3 h-3 text-neutral-400" /> {emp.phone || 'No phone'}
+            ) : filteredEmployees.map(emp => {
+              const currentStatus = getStatus(emp);
+
+              return (
+                <tr
+                  key={emp._id || emp.id}
+                  className="group hover:bg-neutral-50/80 transition-all duration-200 cursor-pointer"
+                  onClick={() => onSelectEmployee(emp)}
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3.5">
+                      <div className="relative shrink-0">
+                        <StaffAvatar photo={emp.photo} name={emp.name} size="md" />
+                        <div
+                          className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 border-2 border-white rounded-full ${
+                            currentStatus === 'Present'
+                              ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                              : currentStatus === 'Late'
+                              ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]'
+                              : currentStatus === 'Absent'
+                              ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'
+                              : currentStatus === 'Not Scanned Yet'
+                              ? 'bg-neutral-400'
+                              : 'bg-neutral-300'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <div className="font-bold text-black text-sm group-hover:text-neutral-700 transition-colors">
+                          {emp.name}
+                        </div>
+                        <div className="text-xs text-neutral-500 flex items-center gap-1 font-medium mt-0.5">
+                          <Phone className="w-3 h-3 text-neutral-400" /> {emp.phone || 'No phone'}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-col">
-                    <span className="text-xs font-bold text-neutral-800">{emp.role}</span>
-                    <span className="text-[10px] font-mono font-bold text-neutral-700 bg-neutral-100 px-2.5 py-0.5 rounded-full mt-1 w-fit border border-neutral-200/80">
-                      ID: {emp.employeeId}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border ${
-                    statuses[emp._id] === 'Clocked In'
-                      ? 'bg-black text-white border-black'
-                      : statuses[emp._id] === 'Late'
-                        ? 'bg-amber-50 text-amber-800 border-amber-200'
-                        : statuses[emp._id] === 'Absent'
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-neutral-800">{emp.role}</span>
+                      <span className="text-[10px] font-mono font-bold text-neutral-700 bg-neutral-100 px-2.5 py-0.5 rounded-full mt-1 w-fit border border-neutral-200/80">
+                        ID: {emp.employeeId}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold border transition-colors ${
+                        currentStatus === 'Present'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : currentStatus === 'Late'
+                          ? 'bg-amber-50 text-amber-800 border-amber-200'
+                          : currentStatus === 'Absent'
                           ? 'bg-rose-50 text-rose-800 border-rose-200'
-                          : 'bg-neutral-100 text-neutral-600 border-neutral-200'
-                  }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${
-                      statuses[emp._id] === 'Clocked In' ? 'bg-white' :
-                      statuses[emp._id] === 'Late' ? 'bg-amber-500' :
-                      statuses[emp._id] === 'Absent' ? 'bg-rose-500' : 'bg-neutral-400'
-                    }`} />
-                    {statuses[emp._id] || 'Off Duty'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right">
-                  <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                    <button
-                      className="p-2 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-full transition-all"
-                      onClick={(e) => { e.stopPropagation(); onSelectEmployee(emp); }}
-                      title="View Profile"
+                          : currentStatus === 'Not Scanned Yet'
+                          ? 'bg-neutral-100 text-neutral-700 border-neutral-200'
+                          : 'bg-neutral-50 text-neutral-400 border-neutral-200'
+                      }`}
                     >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                    <button
-                      className={`p-2 rounded-full transition-all ${deletingId === emp._id ? 'text-neutral-400 cursor-not-allowed' : 'text-neutral-500 hover:text-rose-600 hover:bg-rose-50'}`}
-                      onClick={(e) => handleDeleteClick(e, emp._id)}
-                      disabled={deletingId === emp._id}
-                      title="Remove Staff"
-                    >
-                      {deletingId === emp._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          currentStatus === 'Present'
+                            ? 'bg-emerald-500'
+                            : currentStatus === 'Late'
+                            ? 'bg-amber-500'
+                            : currentStatus === 'Absent'
+                            ? 'bg-rose-500'
+                            : currentStatus === 'Not Scanned Yet'
+                            ? 'bg-neutral-500'
+                            : 'bg-neutral-300'
+                        }`}
+                      />
+                      {currentStatus}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                      <button
+                        className="p-2 text-neutral-500 hover:text-black hover:bg-neutral-100 rounded-full transition-all"
+                        onClick={(e) => { e.stopPropagation(); onSelectEmployee(emp); }}
+                        title="View Profile"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button
+                        className={`p-2 rounded-full transition-all ${
+                          deletingId === (emp._id || emp.id)
+                            ? 'text-neutral-400 cursor-not-allowed'
+                            : 'text-neutral-500 hover:text-rose-600 hover:bg-rose-50'
+                        }`}
+                        onClick={(e) => handleDeleteClick(e, emp._id || emp.id)}
+                        disabled={deletingId === (emp._id || emp.id)}
+                        title="Remove Staff"
+                      >
+                        {deletingId === (emp._id || emp.id) ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

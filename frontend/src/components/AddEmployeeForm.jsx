@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Upload, X, Save, Camera, FileText, CheckCircle2, Clock, ArrowLeft, Loader2, ShieldAlert } from 'lucide-react';
 import TimePicker from './TimePicker';
 import { API_URL } from '../lib/api';
-import { supabase, addEmployeeToRoom } from '../lib/supabase';
+import { supabase, addEmployeeToRoom, uploadEmployeeFile } from '../lib/supabase';
 
 const EMAIL_REGEX = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
 
@@ -95,20 +95,65 @@ function AddEmployeeForm({ selectedOffice, onEmployeeAdded, onCancel }) {
       // 1. Generate Employee ID
       const employeeId = `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
 
-      // 2. Direct Supabase Storage / Database Insert if selectedOffice is provided
+      // 2. Upload photo and files to Supabase Storage (or fallback data URLs)
+      let photoUrl = null;
+      if (photo) {
+        photoUrl = await uploadEmployeeFile(photo, 'avatars');
+      }
+
+      let cvUrl = null;
+      if (cv) {
+        cvUrl = await uploadEmployeeFile(cv, 'documents');
+      }
+
+      let nationalIdUrl = null;
+      if (nationalIdFile) {
+        nationalIdUrl = await uploadEmployeeFile(nationalIdFile, 'documents');
+      }
+
+      let passportUrl = null;
+      if (passportFile) {
+        passportUrl = await uploadEmployeeFile(passportFile, 'documents');
+      }
+
+      let nssfUrl = null;
+      if (nssfFile) {
+        nssfUrl = await uploadEmployeeFile(nssfFile, 'documents');
+      }
+
+      let contractUrl = null;
+      if (contract) {
+        contractUrl = await uploadEmployeeFile(contract, 'documents');
+      }
+
+      // 3. Direct Supabase Database Insert if selectedOffice is provided
       if (selectedOffice?.id) {
         await addEmployeeToRoom(selectedOffice.id, {
           employeeId,
           name: cleanName,
           role: formData.role,
           phone: cleanPhone,
+          contact: cleanContact,
+          dateOfBirth: formData.dateOfBirth,
+          startDate: formData.startDate,
+          isForeigner: formData.isForeigner,
+          nationalId: formData.nationalId,
+          passport: formData.passport,
+          nssf: formData.nssf,
           shiftStart: formData.shiftStart,
           shiftEnd: formData.shiftEnd,
           workDays: formData.workDays,
+          requiredHours: formData.requiredHours || 8,
+          photoUrl: photoUrl,
+          cvUrl: cvUrl,
+          nationalIdFileUrl: nationalIdUrl,
+          passportFileUrl: passportUrl,
+          nssfFileUrl: nssfUrl,
+          contractUrl: contractUrl,
         });
       }
 
-      // 3. Fallback to Local Node Backend if running
+      // 4. Fallback to Local Node Backend if running
       try {
         const data = new FormData();
         Object.keys(formData).forEach(key => {

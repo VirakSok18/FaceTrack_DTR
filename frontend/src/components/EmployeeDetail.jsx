@@ -2,7 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { API_URL, getFileUrl } from '../lib/api';
 import {
-  ArrowLeft, Mail, Phone, Calendar, Clock, Edit2, Save, X, FileText, ExternalLink, LayoutDashboard, Camera, Upload, Loader2
+  supabase,
+  fetchEmployeeById,
+  fetchEmployeeAttendanceLogs,
+  updateEmployeeInRoom,
+  uploadEmployeeFile,
+} from '../lib/supabase';
+import StaffAvatar from './StaffAvatar';
+import {
+  ArrowLeft,
+  Mail,
+  Phone,
+  Calendar,
+  Clock,
+  Edit2,
+  Save,
+  X,
+  FileText,
+  ExternalLink,
+  LayoutDashboard,
+  Camera,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import TimePicker from './TimePicker';
 
@@ -11,7 +33,7 @@ function EmployeeDetail({ onBack, onUpdate }) {
   const [employee, setEmployee] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [attendance, setAttendance] = useState([]);
-  const [summary, setSummary] = useState({ totalLates: 0, totalAbsents: 0, totalHalfDays: 0, totalWorkedHours: 0 });
+  const [summary, setSummary] = useState({ totalLates: 0, totalAbsents: 0, totalWorkedHours: 0 });
   const [loading, setLoading] = useState(true);
   const [editedData, setEditedData] = useState({});
   const [newPhoto, setNewPhoto] = useState(null);
@@ -22,8 +44,9 @@ function EmployeeDetail({ onBack, onUpdate }) {
   const [newContract, setNewContract] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [feedbackMsg, setFeedbackMsg] = useState(null);
 
-  // Dynamic Agge calculation
+  // Dynamic Age calculation
   const calculateAge = (dobString) => {
     if (!dobString) return '';
     const dob = new Date(dobString);
@@ -34,21 +57,42 @@ function EmployeeDetail({ onBack, onUpdate }) {
   };
 
   useEffect(() => {
+    let isMounted = true;
+    let subscription = null;
+
     const fetchEmployeeData = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_URL}/employees`);
-        const allEmployees = await res.json();
-        const found = allEmployees.find(e => e.employeeId === id);
+        // 1. Fetch employee directly from Supabase
+        let found = await fetchEmployeeById(id);
 
-        if (found) {
+        // Fallback to legacy local node API if not found in Supabase
+        if (!found) {
+          try {
+            const res = await fetch(`${API_URL}/employees`);
+            if (res.ok) {
+              const allEmployees = await res.json();
+              found = allEmployees.find(e => e.employeeId === id || e._id === id || e.id === id);
+              if (found) {
+                found = {
+                  ...found,
+                  _id: found._id || found.id,
+                  employeeId: found.employeeId || found.employee_id,
+                  photo: found.photo || found.photo_url,
+                };
+              }
+            }
+          } catch (_) {}
+        }
+
+        if (found && isMounted) {
           setEmployee(found);
           setEditedData({
-            name: found.name,
+            name: found.name || '',
             role: found.role || 'Software Engineer',
             dateOfBirth: found.dateOfBirth ? new Date(found.dateOfBirth).toISOString().split('T')[0] : '',
-            contact: found.contact,
-            phone: found.phone,
+            contact: found.contact || '',
+            phone: found.phone || '',
             isForeigner: found.isForeigner || false,
             nationalId: found.nationalId || '',
             passport: found.passport || '',
@@ -57,54 +101,193 @@ function EmployeeDetail({ onBack, onUpdate }) {
             workDays: found.workDays || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
             shiftStart: found.shiftStart || '09:00',
             shiftEnd: found.shiftEnd || '18:00',
-            requiredHours: found.requiredHours || 8
+            requiredHours: found.requiredHours || 8,
           });
 
-          // Fetch attendance and summary
-          const [attRes, sumRes] = await Promise.all([
-            fetch(`${API_URL}/dtr/${id}`),
-            fetch(`${API_URL}/dtr/summary/${id}`)
-          ]);
-          setAttendance(await attRes.json());
-          setSummary(await sumRes.json());
+          // 2. Fetch attendance logs from Supabase
+          const empLogs = await fetchEmployeeAttendanceLogs(found.employeeId || found.id);
+          
+          if (empLogs.length > 0) {
+            setAttendance(empLogs);
+            calculateSummary(empLogs);
+          } else {
+            // Fallback to legacy DTR endpoint
+            try {
+              const [attRes, sumRes] = await Promise.all([
+                fetch(`${API_URL}/dtr/${id}`),
+                fetch(`${API_URL}/dtr/summary/${id}`),
+              ]);
+              if (attRes.ok) {
+                const legacyLogs = await attRes.json();
+                setAttendance(Array.isArray(legacyLogs) ? legacyLogs : []);
+              }
+              if (sumRes.ok) {
+                const legacySum = await sumRes.json();
+                setSummary(legacySum || { totalLates: 0, totalAbsents: 0, totalWorkedHours: 0 });
+              }
+            } catch (_) {}
+          }
+
+          // 3. Subscribe to real-time attendance logs for this employee
+          subscription = supabase
+            .channel(`emp_logs_${found.employeeId || found.id}`)
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'dtr_attendance_logs',
+                filter: `employee_id=eq.${found.employeeId}`,
+              },
+              async () => {
+                const freshLogs = await fetchEmployeeAttendanceLogs(found.employeeId);
+                if (isMounted) {
+                  setAttendance(freshLogs);
+                  calculateSummary(freshLogs);
+                }
+              }
+            )
+            .subscribe();
         }
       } catch (error) {
         console.error('Error fetching employee detail data:', error);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
+
     fetchEmployeeData();
+
+    return () => {
+      isMounted = false;
+      if (subscription) {
+        supabase.removeChannel(subscription);
+      }
+    };
   }, [id]);
+
+  const calculateSummary = (logs) => {
+    let lates = 0;
+    let absents = 0;
+    let worked = 0;
+
+    for (const log of logs) {
+      if (log.status === 'Late' || Number(log.lateMinutes) > 0) {
+        lates += 1;
+      } else if (log.status === 'Absent') {
+        absents += 1;
+      }
+      if (log.workedHours) {
+        worked += Number(log.workedHours) || 0;
+      }
+    }
+
+    setSummary({
+      totalLates: lates,
+      totalAbsents: absents,
+      totalWorkedHours: parseFloat(worked.toFixed(1)),
+    });
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
+    setFeedbackMsg(null);
+
     try {
-      const formData = new FormData();
-      Object.keys(editedData).forEach(key => {
-        if (key === 'workDays') {
-          formData.append(key, JSON.stringify(editedData[key]));
-        } else {
-          formData.append(key, editedData[key]);
-        }
+      // 1. Upload any new files (photo or documents)
+      let photoUrl = employee.photo;
+      if (newPhoto) {
+        photoUrl = await uploadEmployeeFile(newPhoto, 'avatars');
+      }
+
+      let cvUrl = employee.cv;
+      if (newCV) {
+        cvUrl = await uploadEmployeeFile(newCV, 'documents');
+      }
+
+      let nationalIdFileUrl = employee.nationalIdFile;
+      if (newNationalIdFile) {
+        nationalIdFileUrl = await uploadEmployeeFile(newNationalIdFile, 'documents');
+      }
+
+      let passportFileUrl = employee.passportFile;
+      if (newPassportFile) {
+        passportFileUrl = await uploadEmployeeFile(newPassportFile, 'documents');
+      }
+
+      let nssfFileUrl = employee.nssfFile;
+      if (newNssfFile) {
+        nssfFileUrl = await uploadEmployeeFile(newNssfFile, 'documents');
+      }
+
+      let contractUrl = employee.contract;
+      if (newContract) {
+        contractUrl = await uploadEmployeeFile(newContract, 'documents');
+      }
+
+      // 2. Direct Supabase Update
+      const updated = await updateEmployeeInRoom(employee.id || employee._id || id, {
+        name: (editedData.name || '').trim(),
+        role: editedData.role,
+        contact: (editedData.contact || '').trim(),
+        phone: (editedData.phone || '').trim(),
+        dateOfBirth: editedData.dateOfBirth || null,
+        startDate: editedData.startDate || null,
+        isForeigner: editedData.isForeigner,
+        nationalId: editedData.nationalId || '',
+        passport: editedData.passport || '',
+        nssf: editedData.nssf || '',
+        shiftStart: editedData.shiftStart || '09:00',
+        shiftEnd: editedData.shiftEnd || '18:00',
+        workDays: editedData.workDays || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        photoUrl: photoUrl,
+        cvUrl: cvUrl,
+        nationalIdFileUrl: nationalIdFileUrl,
+        passportFileUrl: passportFileUrl,
+        nssfFileUrl: nssfFileUrl,
+        contractUrl: contractUrl,
       });
 
-      if (newPhoto) formData.append('photo', newPhoto);
-      if (newCV) formData.append('cv', newCV);
-      if (newNationalIdFile) formData.append('nationalIdFile', newNationalIdFile);
-      if (newPassportFile) formData.append('passportFile', newPassportFile);
-      if (newNssfFile) formData.append('nssfFile', newNssfFile);
-      if (newContract) formData.append('contract', newContract);
+      if (updated) {
+        setEmployee(updated);
+      } else {
+        // Fallback update local state
+        setEmployee((prev) => ({
+          ...prev,
+          ...editedData,
+          photo: photoUrl,
+          cv: cvUrl,
+          nationalIdFile: nationalIdFileUrl,
+          passportFile: passportFileUrl,
+          nssfFile: nssfFileUrl,
+          contract: contractUrl,
+        }));
+      }
 
-      const response = await fetch(`${API_URL}/employees/${employee._id}`, {
-        method: 'PUT',
-        body: formData
-      });
+      // 3. Also try legacy Node API if running
+      try {
+        const formData = new FormData();
+        Object.keys(editedData).forEach(key => {
+          if (key === 'workDays') {
+            formData.append(key, JSON.stringify(editedData[key]));
+          } else {
+            formData.append(key, editedData[key]);
+          }
+        });
+        if (newPhoto) formData.append('photo', newPhoto);
+        if (newCV) formData.append('cv', newCV);
+        if (newNationalIdFile) formData.append('nationalIdFile', newNationalIdFile);
+        if (newPassportFile) formData.append('passportFile', newPassportFile);
+        if (newNssfFile) formData.append('nssfFile', newNssfFile);
+        if (newContract) formData.append('contract', newContract);
 
-      if (!response.ok) throw new Error('Failed to update employee');
+        await fetch(`${API_URL}/employees/${employee._id || employee.id}`, {
+          method: 'PUT',
+          body: formData,
+        });
+      } catch (_) {}
 
-      const updatedEmployee = await response.json();
-      setEmployee(updatedEmployee);
+      // Reset file staging
       setNewPhoto(null);
       setNewCV(null);
       setNewNationalIdFile(null);
@@ -112,85 +295,107 @@ function EmployeeDetail({ onBack, onUpdate }) {
       setNewNssfFile(null);
       setNewContract(null);
       setPhotoPreview(null);
-      onUpdate();
       setIsEditing(false);
+
+      if (onUpdate) onUpdate();
+      setFeedbackMsg('Profile updated successfully!');
+      setTimeout(() => setFeedbackMsg(null), 3000);
     } catch (error) {
-      alert(error.message);
+      console.error('Save error:', error);
+      alert(error.message || 'Failed to update employee profile.');
     } finally {
       setIsSaving(false);
     }
   };
 
   const toggleDay = (day) => {
-    const newDays = editedData.workDays.includes(day)
-      ? editedData.workDays.filter(d => d !== day)
-      : [...editedData.workDays, day];
+    const current = editedData.workDays || [];
+    const newDays = current.includes(day)
+      ? current.filter(d => d !== day)
+      : [...current, day];
     setEditedData({ ...editedData, workDays: newDays });
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Present': return 'bg-emerald-100 text-emerald-700';
-      case 'Late': return 'bg-amber-100 text-amber-700';
-      case 'Absent': return 'bg-rose-100 text-rose-700';
-      default: return 'bg-slate-100 text-slate-700';
-    }
   };
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-10 h-10 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Phasing employee data...</p>
+        <div className="w-10 h-10 border-4 border-neutral-200 border-t-black rounded-full animate-spin" />
+        <p className="text-neutral-500 font-bold uppercase tracking-wider text-xs">Loading staff records...</p>
       </div>
     );
   }
 
   if (!employee) {
     return (
-      <div className="text-center py-20 bg-white rounded-3xl shadow-xl">
-        <h2 className="text-2xl font-bold text-slate-400">Employee record not found</h2>
-        <button onClick={onBack} className="mt-4 btn btn-primary">Return to Directory</button>
+      <div className="text-center py-20 bg-white border border-neutral-200 rounded-3xl p-8 max-w-xl mx-auto shadow-sm">
+        <div className="w-16 h-16 bg-neutral-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-neutral-400">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-black text-black tracking-tight">Staff Member Not Found</h2>
+        <p className="text-neutral-500 text-xs font-medium mt-2 max-w-md mx-auto">
+          The requested staff record could not be located in this office registry or may have been deleted.
+        </p>
+        <button
+          onClick={onBack}
+          className="mt-6 inline-flex items-center gap-2 px-6 py-2.5 bg-black hover:bg-neutral-800 text-white rounded-full font-bold text-xs shadow-sm transition-all"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Return to Dashboard</span>
+        </button>
       </div>
     );
   }
 
   return (
     <div className="space-y-8 pb-12 animate-fade-in">
+      {/* Top Bar */}
       <div className="flex items-center justify-between">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-slate-700 hover:text-black transition-all font-bold group bg-white px-5 py-2.5 rounded-xl border border-slate-200 shadow-sm hover:shadow-md"
+          className="flex items-center gap-2 text-neutral-700 hover:text-black transition-all font-bold group bg-white px-5 py-2.5 rounded-full border border-neutral-200 shadow-sm hover:shadow-md text-xs"
         >
-          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" /> Back to List
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+          <span>Back to Staff Registry</span>
         </button>
+
+        {feedbackMsg && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-full animate-fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>{feedbackMsg}</span>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Profile Card */}
+        {/* Left Column: Profile & Shift Card */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="glass-card rounded-[2.5rem] overflow-hidden p-8 text-center relative border border-slate-300">
-            <div className="absolute top-0 left-0 w-full h-32 bg-slate-900"></div>
+          <div className="bg-white rounded-3xl overflow-hidden p-8 text-center relative border border-neutral-200 shadow-sm">
+            {/* Header Banner */}
+            <div className="absolute top-0 left-0 w-full h-28 bg-neutral-900" />
 
-            <div className="relative pt-12 mb-6">
-              <div className="w-40 h-40 rounded-3xl border-8 border-white/50 shadow-2xl mx-auto overflow-hidden bg-white rotate-3 group hover:rotate-0 transition-transform duration-500 relative">
-                <img
-                  src={photoPreview || getFileUrl(employee.photo) || 'https://via.placeholder.com/150'}
-                  alt={employee.name}
-                  className="w-full h-full object-cover"
+            {/* Profile Avatar */}
+            <div className="relative pt-8 mb-6">
+              <div className="w-36 h-36 rounded-3xl border-4 border-white shadow-xl mx-auto overflow-hidden bg-neutral-900 relative">
+                <StaffAvatar
+                  photo={photoPreview || employee.photo}
+                  name={employee.name}
+                  size="full"
                 />
+
                 {isEditing && (
-                  <label className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center cursor-pointer opacity-0 hover:opacity-100 transition-opacity">
-                    <Camera className="w-8 h-8 text-white mb-2" />
-                    <span className="text-[10px] font-bold text-white uppercase tracking-widest">Update Photo</span>
+                  <label className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center cursor-pointer transition-opacity backdrop-blur-xs">
+                    <Camera className="w-7 h-7 text-white mb-1.5" />
+                    <span className="text-[10px] font-black text-white uppercase tracking-wider">Change Photo</span>
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files[0];
-                        setNewPhoto(file);
-                        if (file) setPhotoPreview(URL.createObjectURL(file));
+                        if (file) {
+                          setNewPhoto(file);
+                          setPhotoPreview(URL.createObjectURL(file));
+                        }
                       }}
                     />
                   </label>
@@ -198,20 +403,22 @@ function EmployeeDetail({ onBack, onUpdate }) {
               </div>
             </div>
 
+            {/* Employee Name & Role */}
             {isEditing ? (
               <div className="space-y-4 text-left relative">
                 <div>
-                  <label className="text-xs font-bold text-slate-900 uppercase tracking-widest ml-1">Name</label>
+                  <label className="text-xs font-bold text-neutral-700 ml-1">Full Name</label>
                   <input
-                    className="input-field mt-1 shadow-sm"
+                    type="text"
+                    className="w-full mt-1 px-4 py-2.5 bg-neutral-50 border border-neutral-300 rounded-2xl text-xs font-semibold text-black focus:outline-none focus:ring-2 focus:ring-black"
                     value={editedData.name}
                     onChange={(e) => setEditedData({ ...editedData, name: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-900 uppercase tracking-widest ml-1">Position</label>
+                  <label className="text-xs font-bold text-neutral-700 ml-1">Position / Role</label>
                   <select
-                    className="input-field mt-1 shadow-sm"
+                    className="w-full mt-1 px-4 py-2.5 bg-neutral-50 border border-neutral-300 rounded-2xl text-xs font-semibold text-black focus:outline-none focus:ring-2 focus:ring-black"
                     value={editedData.role}
                     onChange={(e) => setEditedData({ ...editedData, role: e.target.value })}
                   >
@@ -223,301 +430,331 @@ function EmployeeDetail({ onBack, onUpdate }) {
                     <option value="HR Manager">HR Manager</option>
                     <option value="Accountant">Accountant</option>
                     <option value="Support Specialist">Support Specialist</option>
+                    <option value="Operations">Operations</option>
                   </select>
                 </div>
               </div>
             ) : (
               <div className="space-y-2 relative">
-                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{employee.name}</h1>
+                <h1 className="text-2xl font-black text-black tracking-tight">{employee.name}</h1>
                 <div className="flex flex-col items-center gap-2">
-                  <div className="inline-block px-3 py-1 bg-slate-900 text-white rounded-full text-xs font-bold uppercase tracking-widest">
+                  <div className="inline-block px-3 py-1 bg-black text-white rounded-full text-[11px] font-bold">
                     {employee.role}
                   </div>
-                  <div className="text-[12px] font-black uppercase tracking-[0.2em] flex gap-3 text-slate-500">
+                  <div className="text-[11px] font-mono font-bold uppercase flex items-center gap-2 text-neutral-500 mt-1">
                     <span>ID: {employee.employeeId}</span>
                     <span>•</span>
-                    <span>{calculateAge(employee.dateOfBirth) || '--'} YRS</span>
+                    <span>{calculateAge(employee.dateOfBirth) ? `${calculateAge(employee.dateOfBirth)} YRS` : 'Active'}</span>
                   </div>
                 </div>
               </div>
             )}
 
-            <div className="mt-8 pt-8 border-t border-slate-100 flex flex-col gap-3 relative">
+            {/* Edit / Save Action Bar */}
+            <div className="mt-8 pt-6 border-t border-neutral-100 flex flex-col gap-3 relative">
               {isEditing ? (
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   <button
                     onClick={handleSave}
                     disabled={isSaving}
-                    className="flex-1 btn btn-primary bg-slate-900 shadow-none flex items-center justify-center gap-2"
+                    className="flex-1 py-2.5 bg-black hover:bg-neutral-800 disabled:opacity-50 text-white rounded-full text-xs font-bold shadow-sm flex items-center justify-center gap-2 transition-all"
                   >
                     {isSaving ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin text-white" />
-                        Saving...
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Saving...</span>
                       </>
                     ) : (
                       <>
-                        <Save className="w-4 h-4" /> Commit Changes
+                        <Save className="w-3.5 h-3.5" />
+                        <span>Save Changes</span>
                       </>
                     )}
                   </button>
-                  <button onClick={() => setIsEditing(false)} className="flex-1 btn btn-secondary border border-slate-200">
-                    <X className="w-4 h-4" /> Discard
+                  <button
+                    onClick={() => {
+                      setIsEditing(false);
+                      setPhotoPreview(null);
+                      setNewPhoto(null);
+                    }}
+                    className="flex-1 py-2.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Discard</span>
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="w-full btn btn-secondary text-slate-600 bg-slate-50 border border-slate-200 hover:bg-white"
+                  className="w-full py-2.5 bg-neutral-50 hover:bg-neutral-100 text-neutral-800 border border-neutral-200 rounded-full text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
                 >
-                  <Edit2 className="w-4 h-4" /> Edit Profile Records
+                  <Edit2 className="w-3.5 h-3.5" />
+                  <span>Edit Profile</span>
                 </button>
               )}
             </div>
           </div>
 
-          <div className="bg-white rounded-[2rem] p-8 space-y-6 border border-slate-300">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
-              <Clock className="w-4 h-4 text-slate-900" /> Operational Shift
+          {/* Operational Shift Card */}
+          <div className="bg-white rounded-3xl p-6 space-y-5 border border-neutral-200 shadow-sm">
+            <h3 className="text-xs font-black text-black uppercase tracking-wider flex items-center gap-2">
+              <Clock className="w-4 h-4 text-black" />
+              <span>Operational Shift Schedule</span>
             </h3>
-            <div className="space-y-6">
-              <div>
-                <div className="text-xs text-slate-600 font-bold mb-3 uppercase tracking-widest">Active Weekdays</div>
-                <div className="flex flex-wrap gap-2">
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
+
+            <div>
+              <div className="text-[11px] text-neutral-500 font-bold mb-2">Workdays</div>
+              <div className="flex flex-wrap gap-1.5">
+                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
+                  const active = (isEditing ? editedData.workDays : (employee.workDays || [])).includes(day);
+                  return (
                     <button
                       key={day}
+                      type="button"
                       disabled={!isEditing}
                       onClick={() => toggleDay(day)}
-                      className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition-all uppercase tracking-tighter ${(isEditing ? editedData.workDays : (employee.workDays || [])).includes(day)
-                        ? 'bg-slate-900 text-white shadow-lg'
-                        : 'bg-slate-50 text-slate-300'
-                        }`}
+                      className={`px-3 py-1 rounded-xl text-[10px] font-bold transition-all ${
+                        active
+                          ? 'bg-black text-white shadow-sm'
+                          : 'bg-neutral-100 text-neutral-400 border border-neutral-200/60'
+                      }`}
                     >
                       {day.slice(0, 3)}
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  {isEditing ? (
-                    <TimePicker
-                      label="Shift Starts"
-                      value={editedData.shiftStart}
-                      onChange={(time) => setEditedData({ ...editedData, shiftStart: time })}
-                    />
-                  ) : (
-                    <>
-                      <div className="text-xs text-slate-600 font-bold mb-1 uppercase tracking-widest">Shift Starts</div>
-                      <div className="text-lg font-bold text-slate-800">{employee.shiftStart || '09:00'}</div>
-                    </>
-                  )}
-                </div>
-                <div>
-                  {isEditing ? (
-                    <TimePicker
-                      label="Shift Ends"
-                      value={editedData.shiftEnd}
-                      onChange={(time) => setEditedData({ ...editedData, shiftEnd: time })}
-                    />
-                  ) : (
-                    <>
-                      <div className="text-xs text-slate-600 font-bold mb-1 uppercase tracking-widest">Shift Ends</div>
-                      <div className="text-lg font-bold text-slate-800">{employee.shiftEnd || '18:00'}</div>
-                    </>
-                  )}
-                </div>
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-neutral-100">
+              <div>
+                {isEditing ? (
+                  <TimePicker
+                    label="Shift Starts"
+                    value={editedData.shiftStart}
+                    onChange={(time) => setEditedData({ ...editedData, shiftStart: time })}
+                  />
+                ) : (
+                  <>
+                    <div className="text-[11px] text-neutral-500 font-bold mb-0.5">Shift Starts</div>
+                    <div className="text-base font-black text-black">{employee.shiftStart || '09:00'}</div>
+                  </>
+                )}
+              </div>
+              <div>
+                {isEditing ? (
+                  <TimePicker
+                    label="Shift Ends"
+                    value={editedData.shiftEnd}
+                    onChange={(time) => setEditedData({ ...editedData, shiftEnd: time })}
+                  />
+                ) : (
+                  <>
+                    <div className="text-[11px] text-neutral-500 font-bold mb-0.5">Shift Ends</div>
+                    <div className="text-base font-black text-black">{employee.shiftEnd || '18:00'}</div>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Performance Monitor Section */}
-          <div className="glass-card rounded-[2rem] p-8 space-y-6 border border-slate-300 bg-white">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-widest flex items-center gap-2">
-                <LayoutDashboard className="w-4 h-4 text-slate-900" /> Punctuality Monitor
-              </h3>
-            </div>
+          {/* Punctuality Monitor */}
+          <div className="bg-white rounded-3xl p-6 space-y-4 border border-neutral-200 shadow-sm">
+            <h3 className="text-xs font-black text-black uppercase tracking-wider flex items-center gap-2">
+              <LayoutDashboard className="w-4 h-4 text-black" />
+              <span>Punctuality & Attendance</span>
+            </h3>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-white rounded-2xl border border-slate-200">
-                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Total Lates</div>
-                <div className="text-2xl font-black text-slate-900">{summary.totalLates}d</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-4 bg-amber-50/50 border border-amber-200/80 rounded-2xl">
+                <div className="text-[10px] text-amber-700 font-bold uppercase tracking-wider mb-1">Total Lates</div>
+                <div className="text-2xl font-black text-amber-900">{summary.totalLates}d</div>
               </div>
-              <div className="p-4 bg-white rounded-2xl border border-slate-200">
-                <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Absences</div>
-                <div className="text-2xl font-black text-slate-900">{summary.totalAbsents}d</div>
+              <div className="p-4 bg-rose-50/50 border border-rose-200/80 rounded-2xl">
+                <div className="text-[10px] text-rose-700 font-bold uppercase tracking-wider mb-1">Total Absences</div>
+                <div className="text-2xl font-black text-rose-900">{summary.totalAbsents}d</div>
               </div>
-              {/* Other stats removed as per request to focus on lates and absences */}
             </div>
           </div>
         </div>
 
-        {/* Detailed Info Section */}
-        <div className="lg:col-span-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Right Column: Contact, Documents & Attendance History */}
+        <div className="lg:col-span-8 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Contact Info Card */}
-            <div className="bg-white rounded-[2.5rem] p-8 border border-slate-300">
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-slate-900" /> Contact Info
+            <div className="bg-white rounded-3xl p-6 border border-neutral-200 shadow-sm space-y-4">
+              <h3 className="text-xs font-black text-black uppercase tracking-wider flex items-center gap-2">
+                <Mail className="w-4 h-4 text-black" />
+                <span>Contact Details</span>
               </h3>
-              <div className="space-y-6">
+
+              <div className="space-y-4">
                 <div>
-                  <div className="text-xs text-slate-500 font-bold uppercase tracking-widest">Corporate Email</div>
+                  <div className="text-[11px] text-neutral-500 font-bold">Email Address</div>
                   {isEditing ? (
                     <input
-                      className="input-field mt-2"
+                      type="email"
+                      className="w-full mt-1 px-4 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-xs font-semibold text-black focus:outline-none focus:ring-1 focus:ring-black"
                       value={editedData.contact}
                       onChange={(e) => setEditedData({ ...editedData, contact: e.target.value })}
                     />
                   ) : (
-                    <div className="text-slate-800 font-bold mt-1 text-lg">{employee.contact}</div>
+                    <div className="text-sm font-bold text-black mt-0.5">{employee.contact || 'No email provided'}</div>
                   )}
                 </div>
+
                 <div>
-                  <div className="text-xs text-slate-500 font-bold uppercase tracking-widest">Telecommunications</div>
+                  <div className="text-[11px] text-neutral-500 font-bold">Phone Number</div>
                   {isEditing ? (
                     <input
-                      className="input-field mt-2"
+                      type="tel"
+                      className="w-full mt-1 px-4 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-xs font-semibold text-black focus:outline-none focus:ring-1 focus:ring-black"
                       value={editedData.phone}
                       onChange={(e) => setEditedData({ ...editedData, phone: e.target.value })}
                     />
                   ) : (
-                    <div className="text-slate-800 font-bold mt-1 text-lg">{employee.phone}</div>
+                    <div className="text-sm font-bold text-black mt-0.5">{employee.phone || 'No phone provided'}</div>
                   )}
                 </div>
+
                 <div>
-                  <div className="text-xs text-slate-500 font-bold uppercase tracking-widest">Date of Birth</div>
+                  <div className="text-[11px] text-neutral-500 font-bold">Date of Birth</div>
                   {isEditing ? (
                     <input
                       type="date"
-                      className="input-field mt-2"
+                      className="w-full mt-1 px-4 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-xs font-semibold text-black focus:outline-none focus:ring-1 focus:ring-black"
                       value={editedData.dateOfBirth}
                       onChange={(e) => setEditedData({ ...editedData, dateOfBirth: e.target.value })}
                     />
                   ) : (
-                    <div className="text-slate-800 font-bold mt-1 text-lg">
+                    <div className="text-sm font-bold text-black mt-0.5">
                       {employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString('en-US', {
                         year: 'numeric', month: 'long', day: 'numeric'
-                      }) : '--'}
+                      }) : 'Not provided'}
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Employment & Documents Card */}
-            <div className="bg-white rounded-[2.5rem] p-8 border border-slate-300">
-              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <FileText className="w-4 h-4 text-slate-900" /> Employment & Records
+            {/* Employment & Identity Records */}
+            <div className="bg-white rounded-3xl p-6 border border-neutral-200 shadow-sm space-y-4">
+              <h3 className="text-xs font-black text-black uppercase tracking-wider flex items-center gap-2">
+                <FileText className="w-4 h-4 text-black" />
+                <span>Employment & Identity</span>
               </h3>
-              <div className="space-y-6">
+
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">Nationality</div>
+                    <div className="text-[11px] text-neutral-500 font-bold mb-1">Status</div>
                     {isEditing ? (
                       <div className="flex gap-1">
                         <button
                           type="button"
-                          onClick={() => setEditedData({ ...editedData, isForeigner: false, passport: '' })}
-                          className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase ${!editedData.isForeigner ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}
+                          onClick={() => setEditedData({ ...editedData, isForeigner: false })}
+                          className={`flex-1 py-1 rounded-xl text-[10px] font-bold ${!editedData.isForeigner ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-500'}`}
                         >
                           Local
                         </button>
                         <button
                           type="button"
-                          onClick={() => setEditedData({ ...editedData, isForeigner: true, nationalId: '' })}
-                          className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase ${editedData.isForeigner ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}
+                          onClick={() => setEditedData({ ...editedData, isForeigner: true })}
+                          className={`flex-1 py-1 rounded-xl text-[10px] font-bold ${editedData.isForeigner ? 'bg-black text-white' : 'bg-neutral-100 text-neutral-500'}`}
                         >
-                          Foreigner
+                          Foreign
                         </button>
                       </div>
                     ) : (
-                      <div className="text-slate-800 font-bold text-sm">
-                        {employee.isForeigner ? 'Foreigner' : 'Local'}
+                      <div className="text-sm font-bold text-black">
+                        {employee.isForeigner ? 'Foreign Staff' : 'Local Staff'}
                       </div>
                     )}
                   </div>
 
                   <div>
-                    <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1.5">Joined Date</div>
+                    <div className="text-[11px] text-neutral-500 font-bold mb-1">Joined Date</div>
                     {isEditing ? (
                       <input
                         type="date"
-                        className="w-full bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 text-xs font-bold"
+                        className="w-full bg-neutral-50 border border-neutral-300 rounded-xl px-2 py-1 text-xs font-bold"
                         value={editedData.startDate}
                         onChange={(e) => setEditedData({ ...editedData, startDate: e.target.value })}
                       />
                     ) : (
-                      <div className="text-slate-800 font-bold text-sm">
-                        {new Date(employee.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      <div className="text-sm font-bold text-black">
+                        {employee.startDate ? new Date(employee.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A'}
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="pt-6 border-t border-slate-50">
-                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-4">Documentation Scans</div>
-                  <div className="grid grid-cols-1 gap-2">
-                    {(() => {
-                      const renderSmallFile = (fileData, label, newFileState, setNewFileState) => (
-                        <div className="flex items-center justify-between p-2.5 bg-slate-50/50 rounded-2xl border border-slate-100/50 group hover:border-slate-200 transition-all">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 flex items-center justify-center shadow-sm">
-                              <FileText className="w-4 h-4 text-slate-400" />
-                            </div>
-                            <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight">{label}</span>
-                          </div>
+                {/* Identity Document Numbers */}
+                <div className="space-y-2 pt-2 border-t border-neutral-100 text-xs">
+                  {(!employee.isForeigner || isEditing) && (
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-neutral-500 font-bold">National ID:</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          className="px-2 py-1 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono font-bold"
+                          value={editedData.nationalId}
+                          onChange={(e) => setEditedData({ ...editedData, nationalId: e.target.value })}
+                        />
+                      ) : (
+                        <span className="font-mono font-bold text-black">{employee.nationalId || 'N/A'}</span>
+                      )}
+                    </div>
+                  )}
 
-                          {isEditing ? (
-                            <label className="cursor-pointer">
-                              <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-400 hover:text-slate-900 hover:border-slate-900 transition-all uppercase">
-                                {newFileState ? 'Ready' : 'Upload'}
-                              </div>
-                              <input type="file" className="hidden" onChange={(e) => setNewFileState(e.target.files[0])} />
-                            </label>
-                          ) : (
-                            getFileUrl(fileData) ? (
-                              <a href={getFileUrl(fileData)} target="_blank" rel="noreferrer" className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-lg hover:scale-105 transition-transform">
-                                <ExternalLink className="w-3.5 h-3.5" />
-                              </a>
-                            ) : (
-                              <span className="text-[9px] font-black text-slate-200 uppercase">Missing</span>
-                            )
-                          )}
-                        </div>
-                      );
+                  {(employee.isForeigner || isEditing) && (
+                    <div className="flex justify-between items-center py-1">
+                      <span className="text-neutral-500 font-bold">Passport:</span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          className="px-2 py-1 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono font-bold"
+                          value={editedData.passport}
+                          onChange={(e) => setEditedData({ ...editedData, passport: e.target.value })}
+                        />
+                      ) : (
+                        <span className="font-mono font-bold text-black">{employee.passport || 'N/A'}</span>
+                      )}
+                    </div>
+                  )}
 
-                      return (
-                        <>
-                          {renderSmallFile(employee.cv, 'CV', newCV, setNewCV)}
-                          {renderSmallFile(employee.contract, 'Contract', newContract, setNewContract)}
-                          {((isEditing && !editedData.isForeigner) || (!isEditing && !employee.isForeigner)) && renderSmallFile(employee.nationalIdFile, 'National ID', newNationalIdFile, setNewNationalIdFile)}
-                          {((isEditing && editedData.isForeigner) || (!isEditing && employee.isForeigner)) && renderSmallFile(employee.passportFile, 'Passport', newPassportFile, setNewPassportFile)}
-                          {renderSmallFile(employee.nssfFile, 'NSSF Card', newNssfFile, setNewNssfFile)}
-                        </>
-                      );
-                    })()}
+                  <div className="flex justify-between items-center py-1">
+                    <span className="text-neutral-500 font-bold">NSSF Number:</span>
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        className="px-2 py-1 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono font-bold"
+                        value={editedData.nssf}
+                        onChange={(e) => setEditedData({ ...editedData, nssf: e.target.value })}
+                      />
+                    ) : (
+                      <span className="font-mono font-bold text-black">{employee.nssf || 'N/A'}</span>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Work History Section */}
-          <div className="glass-card rounded-[2.5rem] overflow-hidden flex flex-col border border-slate-300 bg-white">
-            <div className="p-8 pb-4 flex items-center justify-between">
+          {/* Attendance History Log */}
+          <div className="bg-white rounded-3xl overflow-hidden border border-neutral-200 shadow-sm">
+            <div className="p-6 pb-4 flex items-center justify-between border-b border-neutral-100">
               <div>
-                <h2 className="text-xl font-black text-slate-900 tracking-tight uppercase">History Log</h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Attendance Records</p>
+                <h2 className="text-base font-black text-black tracking-tight">Attendance Record Log</h2>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+                    Verified Face Scans & Time In/Out
+                  </p>
                 </div>
               </div>
-              <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center border border-slate-200">
-                <Calendar className="w-5 h-5 text-slate-900" />
+              <div className="w-10 h-10 bg-neutral-100 rounded-2xl flex items-center justify-center text-black">
+                <Calendar className="w-4 h-4" />
               </div>
             </div>
 
@@ -525,56 +762,79 @@ function EmployeeDetail({ onBack, onUpdate }) {
               <div className="space-y-3">
                 {attendance.length > 0 ? (
                   attendance.map((entry, idx) => (
-                    <div key={idx} className="group flex items-center justify-between p-4 bg-slate-50/50 rounded-[1.5rem] border border-slate-200 hover:bg-white hover:border-slate-300 transition-all duration-300">
-                      <div className="flex items-center gap-6">
+                    <div
+                      key={entry.id || entry._id || idx}
+                      className="flex items-center justify-between p-4 bg-neutral-50/80 rounded-2xl border border-neutral-200/80 hover:bg-neutral-100/60 transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-5">
                         <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Date</span>
-                          <span className="text-sm font-bold text-slate-900">
-                            {new Date(entry.clockIn).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                          <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-0.5">Date</span>
+                          <span className="text-xs font-bold text-black">
+                            {entry.date
+                              ? new Date(entry.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+                              : entry.clockIn
+                              ? new Date(entry.clockIn).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+                              : 'Today'}
                           </span>
                         </div>
 
-                        <div className="h-8 w-px bg-slate-200/50"></div>
+                        <div className="h-7 w-px bg-neutral-200" />
 
                         <div className="flex flex-col">
-                          <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1.5">Timeline</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100/50 shadow-sm">
-                              {new Date(entry.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Time</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                              {entry.clockIn ? new Date(entry.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
                             </span>
-                            <span className="w-4 h-px bg-slate-300/30"></span>
-                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-sm ${entry.clockOut ? 'text-black bg-neutral-100 border border-neutral-200' : 'text-neutral-400 bg-neutral-50 border border-neutral-100 italic'}`}>
+                            <span className="text-neutral-300">→</span>
+                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${entry.clockOut ? 'text-black bg-neutral-200/80 border border-neutral-300' : 'text-neutral-500 bg-neutral-100 border border-neutral-200 italic'}`}>
                               {entry.clockOut ? new Date(entry.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Live'}
                             </span>
                           </div>
                         </div>
 
-                        <div className="hidden md:flex h-8 w-px bg-slate-200/50"></div>
-
-                        <div className="hidden md:flex flex-col">
-                          <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1">Hours</span>
-                          <span className="text-sm font-black text-slate-700">
-                            {entry.workedHours ? `${entry.workedHours}h` : '--'}
-                          </span>
-                        </div>
+                        {entry.workedHours > 0 && (
+                          <>
+                            <div className="hidden sm:block h-7 w-px bg-neutral-200" />
+                            <div className="hidden sm:flex flex-col">
+                              <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-0.5">Duration</span>
+                              <span className="text-xs font-black text-neutral-700">
+                                {entry.workedHours}h
+                              </span>
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       <div className="flex flex-col items-end">
-                        <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-sm ${getStatusStyle(entry.status)}`}>
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold border ${
+                          entry.status === 'Late'
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : entry.status === 'Absent'
+                            ? 'bg-rose-50 text-rose-800 border-rose-200'
+                            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        }`}>
                           {entry.status || 'Present'}
                         </span>
                         {entry.lateMinutes > 0 && (
-                          <span className="text-[9px] font-black text-amber-600 mt-1 uppercase">
-                            Delayed {entry.lateMinutes}m
+                          <span className="text-[9px] font-bold text-amber-700 mt-1">
+                            +{entry.lateMinutes}m Late
                           </span>
                         )}
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="py-20 flex flex-col items-center justify-center gap-4 opacity-20">
-                    <Clock className="w-12 h-12 text-slate-300" />
-                    <span className="text-sm font-black text-slate-400 uppercase tracking-[0.3em]">Log Empty</span>
+                  <div className="py-16 flex flex-col items-center justify-center text-center">
+                    <div className="w-12 h-12 bg-neutral-100 rounded-2xl flex items-center justify-center text-neutral-400 mb-2">
+                      <Clock className="w-6 h-6" />
+                    </div>
+                    <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
+                      No Attendance Scans Yet
+                    </span>
+                    <p className="text-[11px] text-neutral-400 mt-1 max-w-xs">
+                      Clock-in records will appear here as the employee scans face on the kiosk.
+                    </p>
                   </div>
                 )}
               </div>
@@ -585,14 +845,5 @@ function EmployeeDetail({ onBack, onUpdate }) {
     </div>
   );
 }
-
-const getStatusStyle = (status) => {
-  switch (status?.toLowerCase()) {
-    case 'late': return 'bg-amber-50 text-amber-600 border border-amber-100';
-    case 'absent': return 'bg-rose-50 text-rose-600 border border-rose-100';
-    case 'half day': return 'bg-neutral-100 text-neutral-800 border border-neutral-200';
-    default: return 'bg-emerald-50 text-emerald-600 border border-emerald-100';
-  }
-};
 
 export default EmployeeDetail;
