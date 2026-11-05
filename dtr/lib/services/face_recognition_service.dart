@@ -36,6 +36,15 @@ class FaceRecognitionService {
   // Cached enrolled embeddings per workplace: workplaceId -> List<{employeeId, embedding}>
   final Map<String, List<Map<String, dynamic>>> _embeddingCache = {};
 
+  /// Invalidate cached embeddings to force fresh sync from database
+  void clearCache([String? workplaceId]) {
+    if (workplaceId != null) {
+      _embeddingCache.remove(workplaceId);
+    } else {
+      _embeddingCache.clear();
+    }
+  }
+
   // MobileFaceNet standard input dimensions
   static const int inputSize = 112;
   // Threshold: L2 distance <= 0.82 is considered a verified match (equivalent to ~99.55% accuracy)
@@ -234,7 +243,51 @@ class FaceRecognitionService {
           .select('employee_id, embedding')
           .eq('workplace_id', workplaceId);
 
-        enrolledList = List<Map<String, dynamic>>.from(data as List);
+        final rawList = List<Map<String, dynamic>>.from(data as List);
+
+        // Fetch active employees for this workplace to filter out orphaned embeddings
+        final activeEmps = await _supabase
+            .from('dtr_employees')
+            .select('employee_id')
+            .eq('workplace_id', workplaceId);
+
+        final activeIds = (activeEmps as List)
+            .map((e) => e['employee_id']?.toString().trim().toUpperCase())
+            .where((id) => id != null && id.isNotEmpty)
+            .toSet();
+
+        final validList = <Map<String, dynamic>>[];
+        final orphanedIds = <String>[];
+
+        for (final rec in rawList) {
+          final id = rec['employee_id']?.toString().trim().toUpperCase() ?? '';
+          if (id.isEmpty) continue;
+
+          final exists = activeIds.contains(id) ||
+              (id.startsWith('EMP-') && activeIds.contains(id.substring(4).trim())) ||
+              (!id.startsWith('EMP-') && activeIds.contains('EMP-$id'));
+
+          if (exists) {
+            validList.add(rec);
+          } else {
+            orphanedIds.add(rec['employee_id'].toString());
+          }
+        }
+
+        // Clean up orphaned embeddings in background so they don't persist
+        if (orphanedIds.isNotEmpty) {
+          for (final orphan in orphanedIds) {
+            _supabase
+                .from('dtr_face_embeddings')
+                .delete()
+                .eq('workplace_id', workplaceId)
+                .eq('employee_id', orphan)
+                .then((_) => debugPrint('[FaceRecognitionService] Cleaned orphaned embedding: $orphan'))
+                .catchError((e) => debugPrint('[FaceRecognitionService] Orphan cleanup err: $e'));
+          }
+        }
+
+        enrolledList = validList;
         _embeddingCache[workplaceId] = enrolledList;
       } catch (e) {
         debugPrint('[FaceRecognitionService] Error fetching embeddings: $e');

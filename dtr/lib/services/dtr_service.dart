@@ -59,13 +59,31 @@ class DtrService {
     required String employeeId,
     required String currentWorkplaceId,
   }) async {
+    final cleanId = employeeId.trim();
+    if (cleanId.isEmpty) return {'allowed': false, 'reason': 'not_found'};
+
+    // Build search variants so user can match with or without 'EMP-'
+    String idWithPrefix = cleanId;
+    String idWithoutPrefix = cleanId;
+
+    if (cleanId.toUpperCase().startsWith('EMP-')) {
+      idWithoutPrefix = cleanId.substring(4).trim();
+    } else if (cleanId.toUpperCase().startsWith('EMP')) {
+      idWithoutPrefix = cleanId.substring(3).trim();
+    } else {
+      idWithPrefix = 'EMP-$cleanId';
+    }
+
+    final orFilter = 'employee_id.ilike.$cleanId,employee_id.ilike.$idWithPrefix,employee_id.ilike.$idWithoutPrefix';
+
     try {
-      // 1. Check if employee is registered in THIS office
+      // 1. Check if employee is registered in THIS office (flexible prefix matching)
       final inThisRoom = await _supabase
           .from('dtr_employees')
           .select('*')
-          .eq('employee_id', employeeId)
           .eq('workplace_id', currentWorkplaceId)
+          .or(orFilter)
+          .limit(1)
           .maybeSingle();
 
       if (inThisRoom != null) {
@@ -75,11 +93,12 @@ class DtrService {
         };
       }
 
-      // 2. Check if employee belongs to ANOTHER office
+      // 2. Check if employee belongs to ANOTHER office (flexible prefix matching)
       final otherRoomEmp = await _supabase
           .from('dtr_employees')
           .select('*, dtr_workplaces(name)')
-          .eq('employee_id', employeeId)
+          .or(orFilter)
+          .limit(1)
           .maybeSingle();
 
       if (otherRoomEmp != null) {
@@ -139,15 +158,16 @@ class DtrService {
     }
 
     final employee = access['employee'] as Employee;
+    final canonicalId = employee.employeeId;
     final today = DateTime.now().toIso8601String().split('T')[0];
 
     try {
-      // 2. Check today's active attendance log for this office
+      // 2. Check today's active attendance log for this office using canonical ID
       final existingLogs = await _supabase
           .from('dtr_attendance_logs')
           .select('*')
           .eq('workplace_id', workplaceId)
-          .eq('employee_id', employeeId)
+          .eq('employee_id', canonicalId)
           .eq('date', today)
           .order('clock_in', ascending: false)
           .limit(1);
@@ -171,7 +191,7 @@ class DtrService {
           success: true,
           action: 'Clock Out',
           employeeName: employee.name,
-          employeeId: employeeId,
+          employeeId: canonicalId,
           timestamp: now,
           message: 'Clock Out recorded successfully for ${employee.name}',
         );
@@ -194,7 +214,7 @@ class DtrService {
 
         await _supabase.from('dtr_attendance_logs').insert({
           'workplace_id': workplaceId,
-          'employee_id': employeeId,
+          'employee_id': canonicalId,
           'clock_in': now.toIso8601String(),
           'date': today,
           'status': status,
@@ -206,7 +226,7 @@ class DtrService {
           success: true,
           action: 'Clock In',
           employeeName: employee.name,
-          employeeId: employeeId,
+          employeeId: canonicalId,
           timestamp: now,
           message: 'Clock In recorded successfully for ${employee.name}',
         );

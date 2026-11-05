@@ -49,6 +49,9 @@ class _ClockInOutScreenState extends State<ClockInOutScreen> {
       return;
     }
 
+    // Clear cached embeddings to guarantee fresh sync with Supabase
+    FaceRecognitionService().clearCache(_currentRoom!.id);
+
     if (mounted) {
       setState(() {});
       initCamera();
