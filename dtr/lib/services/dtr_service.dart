@@ -175,14 +175,14 @@ class DtrService {
       if (existingLogs.isNotEmpty && existingLogs.first['clock_out'] == null) {
         // Clock Out action
         final log = existingLogs.first;
-        final clockInTime = DateTime.parse(log['clock_in'].toString());
+        final clockInTime = DateTime.parse(log['clock_in'].toString()).toLocal();
         final now = DateTime.now();
         final hours = now.difference(clockInTime).inMinutes / 60.0;
 
         await _supabase
             .from('dtr_attendance_logs')
             .update({
-              'clock_out': now.toIso8601String(),
+              'clock_out': now.toUtc().toIso8601String(),
               'worked_hours': double.parse(hours.toStringAsFixed(2)),
             })
             .eq('id', log['id']);
@@ -215,7 +215,7 @@ class DtrService {
         await _supabase.from('dtr_attendance_logs').insert({
           'workplace_id': workplaceId,
           'employee_id': canonicalId,
-          'clock_in': now.toIso8601String(),
+          'clock_in': now.toUtc().toIso8601String(),
           'date': today,
           'status': status,
           'late_minutes': lateMin,

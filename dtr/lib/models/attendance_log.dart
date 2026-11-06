@@ -29,10 +29,10 @@ class AttendanceLog {
       workplaceId: json['workplace_id']?.toString() ?? '',
       employeeId: json['employee_id']?.toString() ?? '',
       clockIn: json['clock_in'] != null
-          ? DateTime.tryParse(json['clock_in'].toString()) ?? DateTime.now()
+          ? (DateTime.tryParse(json['clock_in'].toString())?.toLocal() ?? DateTime.now())
           : DateTime.now(),
       clockOut: json['clock_out'] != null
-          ? DateTime.tryParse(json['clock_out'].toString())
+          ? DateTime.tryParse(json['clock_out'].toString())?.toLocal()
           : null,
       date: json['date']?.toString() ?? '',
       status: json['status']?.toString() ?? 'Present',
@@ -47,8 +47,8 @@ class AttendanceLog {
       'id': id,
       'workplace_id': workplaceId,
       'employee_id': employeeId,
-      'clock_in': clockIn.toIso8601String(),
-      'clock_out': clockOut?.toIso8601String(),
+      'clock_in': clockIn.toUtc().toIso8601String(),
+      'clock_out': clockOut?.toUtc().toIso8601String(),
       'date': date,
       'status': status,
       'late_minutes': lateMinutes,

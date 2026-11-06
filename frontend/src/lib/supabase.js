@@ -329,6 +329,7 @@ export async function fetchEmployeeAttendanceLogs(employeeId) {
       lateMinutes: l.late_minutes || 0,
       workedHours: l.worked_hours || 0,
       verificationMethod: l.verification_method || 'face_scan',
+      createdAt: l.created_at,
     }));
   } catch (e) {
     console.error('fetchEmployeeAttendanceLogs error:', e);

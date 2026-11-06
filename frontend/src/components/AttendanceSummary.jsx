@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Search, Filter, Download, UserCheck, UserX, Clock } from 'lucide-react';
 
 import { API_URL } from '../lib/api';
+import { formatKhmerTime } from '../lib/timeUtils';
 
 function AttendanceSummary({ employees }) {
     const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
@@ -147,10 +148,10 @@ function AttendanceSummary({ employees }) {
                                         <span className="text-slate-900 font-bold">{emp?.name || record.employeeId}</span>
                                     </td>
                                     <td className="px-6 py-4 text-slate-600 text-sm font-medium">
-                                        {record.clockIn ? new Date(record.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                        {formatKhmerTime(record.clockIn || record.clock_in, record.created_at || record.createdAt)}
                                     </td>
                                     <td className="px-6 py-4 text-slate-600 text-sm font-medium">
-                                        {record.clockOut ? new Date(record.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                                        {formatKhmerTime(record.clockOut || record.clock_out, record.created_at || record.createdAt)}
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className="text-black font-black text-sm">

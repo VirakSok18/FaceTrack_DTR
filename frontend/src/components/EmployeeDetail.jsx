@@ -9,6 +9,7 @@ import {
   uploadEmployeeFile,
 } from '../lib/supabase';
 import StaffAvatar from './StaffAvatar';
+import { formatKhmerTime, formatKhmerDate } from '../lib/timeUtils';
 import {
   ArrowLeft,
   Mail,
@@ -770,11 +771,7 @@ function EmployeeDetail({ onBack, onUpdate }) {
                         <div className="flex flex-col">
                           <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-0.5">Date</span>
                           <span className="text-xs font-bold text-black">
-                            {entry.date
-                              ? new Date(entry.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-                              : entry.clockIn
-                              ? new Date(entry.clockIn).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
-                              : 'Today'}
+                            {formatKhmerDate(entry.date, entry.clockIn, entry.createdAt)}
                           </span>
                         </div>
 
@@ -784,11 +781,11 @@ function EmployeeDetail({ onBack, onUpdate }) {
                           <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-1">Time</span>
                           <div className="flex items-center gap-1.5">
                             <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                              {entry.clockIn ? new Date(entry.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+                              {formatKhmerTime(entry.clockIn, entry.createdAt)}
                             </span>
                             <span className="text-neutral-300">→</span>
                             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${entry.clockOut ? 'text-black bg-neutral-200/80 border border-neutral-300' : 'text-neutral-500 bg-neutral-100 border border-neutral-200 italic'}`}>
-                              {entry.clockOut ? new Date(entry.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Live'}
+                              {entry.clockOut ? formatKhmerTime(entry.clockOut, entry.createdAt) : 'Live'}
                             </span>
                           </div>
                         </div>
